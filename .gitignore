@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+events.json
+models/
+*.ckpt
