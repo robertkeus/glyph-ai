@@ -4,3 +4,4 @@ __pycache__/
 events.json
 models/
 *.ckpt
+baseline_run.log

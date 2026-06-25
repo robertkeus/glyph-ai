@@ -1,0 +1,7 @@
+# Model run only (the harness itself is zero-dependency stdlib).
+# Conservative pins that work on both macOS-x86 (torch capped at 2.2.2) and
+# Kaggle CUDA. numpy<2 for torch 2.2 ABI.
+transformers>=4.40,<5
+accelerate
+numpy<2
+torch>=2.2
