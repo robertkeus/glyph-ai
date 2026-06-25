@@ -38,7 +38,8 @@ def make_generate(model_name=MODEL, max_new_tokens=512):
             tokenize=False, add_generation_prompt=True)
         ids = tok(text, return_tensors="pt").to(device)
         out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False)
-        return tok.decode(out[0][ids.input_ids.shape[1]:], skip_special_tokens=True)
+        gen = out[0][ids.input_ids.shape[1]:].cpu()  # decode on CPU (CUDA/MPS safe)
+        return tok.decode(gen, skip_special_tokens=True)
 
     return generate
 

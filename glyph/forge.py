@@ -31,14 +31,15 @@ def forge_step(task, policy, channel, lam, group_size=8) -> dict:
                                                    task["entry_point"])),
                     task, channel, lam) for m in messages]
     rewards = [r for r, _ in pairs]
-    if has_signal(rewards):
+    signal = has_signal(rewards)
+    if signal:
         policy.learn(sp, messages, group_advantages(rewards))
     n = len(messages)
     return {
         "task": task["id"],
         "pass_rate": sum(ok for _, ok in pairs) / n,
         "mean_reward": sum(rewards) / n,
-        "had_signal": has_signal(rewards),
+        "had_signal": signal,
         "mean_bytes": sum(channel.bytes(m) for m in messages) / n,
     }
 
@@ -63,13 +64,14 @@ def forge_run(tasks, policy, channel=None, steps=200, group_size=8,
     """Illustrative driver: cycle the curriculum, schedule λ by competence, stop
     on the Pareto plateau once competent. Returns per-step metrics."""
     channel = channel or Native()
-    history, bytes_hist = [], []
+    history, bytes_hist, competent = [], [], False
     for step in range(steps):
         pass_rate = history[-1]["pass_rate"] if history else 0.0
+        competent = competent or pass_rate >= knee  # latch: λ never flips back (avoids §D oscillation)
         m = forge_step(tasks[step % len(tasks)], policy, channel,
-                       lam_for(pass_rate, knee=knee), group_size)
+                       lam_for(1.0 if competent else 0.0, knee=knee), group_size)
         history.append(m)
         bytes_hist.append(m["mean_bytes"])
-        if pass_rate >= knee and should_stop(bytes_hist, stop_window):
+        if competent and should_stop(bytes_hist, stop_window):
             break
     return history

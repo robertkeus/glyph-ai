@@ -54,6 +54,16 @@ class TestForge(unittest.TestCase):
         self.assertFalse(should_stop([10, 9, 8, 7, 6, 5], window=3))  # still falling
         self.assertTrue(should_stop([10, 9, 5, 5, 5, 5], window=3))   # flat tail
 
+    def test_run_does_not_stop_while_incompetent(self):
+        class Hopeless:                                  # flat bytes, never passes
+            def sample(self, p, n): return [glyph(0)] * n
+            def build(self, p): return "no"
+            def learn(self, *a): pass
+
+        hist = forge_run([load_tasks()[0]], Hopeless(), steps=12, group_size=4,
+                         knee=0.5, stop_window=3)
+        self.assertEqual(len(hist), 12)  # plateau gate is competence-latched, not bytes-only
+
     def test_run_converges_and_stops(self):
         t = load_tasks()[0]
         hist = forge_run([t], LearningPolicy(t), steps=100, group_size=8,
