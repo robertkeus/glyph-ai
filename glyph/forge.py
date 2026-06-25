@@ -60,9 +60,10 @@ def should_stop(byte_history, window=5) -> bool:
 
 
 def forge_run(tasks, policy, channel=None, steps=200, group_size=8,
-              knee=0.5, stop_window=5) -> list:
+              knee=0.5, stop_window=5, on_step=None) -> list:
     """Illustrative driver: cycle the curriculum, schedule λ by competence, stop
-    on the Pareto plateau once competent. Returns per-step metrics."""
+    on the Pareto plateau once competent. Returns per-step metrics. `on_step(step,
+    metrics)` runs after each step — use it to checkpoint (free tiers cap 12h)."""
     channel = channel or Native()
     history, bytes_hist, competent = [], [], False
     for step in range(steps):
@@ -72,6 +73,8 @@ def forge_run(tasks, policy, channel=None, steps=200, group_size=8,
                        lam_for(1.0 if competent else 0.0, knee=knee), group_size)
         history.append(m)
         bytes_hist.append(m["mean_bytes"])
+        if on_step:
+            on_step(step, m)
         if competent and should_stop(bytes_hist, stop_window):
             break
     return history

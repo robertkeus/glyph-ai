@@ -19,6 +19,7 @@ Zero dependencies, stdlib only — runs on any `python3`, including Kaggle with 
 | Verifier-soundness diagnostic | `smoke.py` | ✅ |
 | Test suite (32 tests, unittest) | `tests/` | ✅ |
 | Phase 1 forge loop (GRPO, model-agnostic) | `glyph/forge.py` | ✅ |
+| Phase 1 two-adapter LoRA policy + masked channel | `glyph/policy.py` | ✅ executes (CPU smoke) |
 | **English baseline, real model** | `run_baseline.py` | ✅ smoke: 0.833 / 676 B ([RESULTS.md](RESULTS.md)) |
 
 ```bash
@@ -29,10 +30,18 @@ python run_baseline.py        # real model → pass_rate + bytes_per_solved (see
 Baseline cleared the bar (0.833 ≥ 0.7) — the harness is proven end-to-end with a
 real model. `bytes_per_solved=676` is the number the forged native channel must beat.
 
-## Next step needs a GPU (Phase 1 training)
+## Phase 1 — run the forge on a GPU
 
-`glyph/forge.py` has the full GRPO forge loop, unit-tested with a fake policy. The
-only missing piece is a real two-adapter LoRA policy (`sample`/`build`/`learn`) —
-which needs a GPU to train (CPU RL over thousands of rollouts is infeasible). On
-Kaggle (T4 x2): wire the policy, run `forge_run` on the curriculum; the cold-start
-probe (`glyph/probe.py`) then decides **from-scratch vs seeded** vocabulary (PLAN §A).
+The full pipeline is built and the training code is **verified to execute** end to
+end (CPU smoke, `scripts/smoke_policy.py`): symbol-masked sampling, builder SFT
+warmup, GRPO backward, checkpointing. Convergence and the §A/§D tuning are the open
+research — they need a GPU (CPU RL over thousands of rollouts is infeasible).
+
+```bash
+pip install -r requirements.txt
+python forge_kaggle.py     # warmup builder (§B) → cold-start probe (§A) → forge_run (§E)
+```
+
+`forge_kaggle.py` warms up the Builder so reward is reachable (§B), runs the
+cold-start probe that decides **from-scratch vs seeded** vocabulary (§A), then
+GRPO-forges the Speaker, checkpointing every 25 steps (free tiers cap 12h).

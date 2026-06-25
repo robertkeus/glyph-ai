@@ -5,3 +5,5 @@ events.json
 models/
 *.ckpt
 baseline_run.log
+smoke_policy.log
+glyph_ckpt/
