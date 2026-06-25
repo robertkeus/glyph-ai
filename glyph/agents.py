@@ -30,8 +30,8 @@ def speaker_prompt(task, channel: Channel) -> str:
 
 def builder_prompt(message: str, entry_point: str) -> str:
     return (f"You are the Builder. Using ONLY the message below, write Python.\n"
-            f"Return one ```python code block defining `{entry_point}`.\n\n"
-            f"Message:\n{message}")
+            f"Output ONLY one ```python code block, nothing else. The function "
+            f"MUST be named exactly `{entry_point}`.\n\nMessage:\n{message}")
 
 
 def episode(task, generate, channel: Channel = None) -> dict:

@@ -25,7 +25,7 @@ def _device_dtype():
     return "cpu", torch.float32
 
 
-def make_generate(model_name=MODEL, max_new_tokens=256):
+def make_generate(model_name=MODEL, max_new_tokens=512):
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     device, dtype = _device_dtype()

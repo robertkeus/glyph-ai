@@ -17,29 +17,22 @@ Zero dependencies, stdlib only — runs on any `python3`, including Kaggle with 
 | Two-agent runtime (Builder sees message only) | `glyph/agents.py` | ✅ |
 | Cold-start reward-variance probe (the gate) | `glyph/probe.py` | ✅ |
 | Verifier-soundness diagnostic | `smoke.py` | ✅ |
-| Test suite (25 tests, unittest) | `tests/` | ✅ |
-| **English baseline, real model** | `kaggle_entry.py` | ⏳ **needs Kaggle GPU run** |
+| Test suite (32 tests, unittest) | `tests/` | ✅ |
+| Phase 1 forge loop (GRPO, model-agnostic) | `glyph/forge.py` | ✅ |
+| **English baseline, real model** | `run_baseline.py` | ✅ smoke: 0.833 / 676 B ([RESULTS.md](RESULTS.md)) |
 
 ```bash
-./check.sh                    # full gate: 25 tests + verifier soundness + curriculum
-python3 -m unittest discover -s tests -t .
-python3 smoke.py
-python3 -m glyph.curriculum
+./check.sh                    # full gate: 32 tests + verifier soundness + curriculum
+python run_baseline.py        # real model → pass_rate + bytes_per_solved (see RESULTS.md)
 ```
 
-## The one remaining step needs your GPU
+Baseline cleared the bar (0.833 ≥ 0.7) — the harness is proven end-to-end with a
+real model. `bytes_per_solved=676` is the number the forged native channel must beat.
 
-Everything that can be validated on a laptop is green. The English baseline needs
-a real model — run on Kaggle (GPU T4 x2):
+## Next step needs a GPU (Phase 1 training)
 
-```bash
-!pip -q install transformers accelerate torch
-!python kaggle_entry.py        # → writes events.json, prints pass_rate + bytes_per_solved
-```
-
-`bytes_per_solved` is the number the forged native channel must later beat
-(PLAN test 1). `pass_rate` decides what's next:
-- ≳0.7 → build the cold-start RL loop on the native channel (probe instrument is ready).
-- weak → widen the easy curriculum or move to Qwen2.5-Coder-3B before any RL.
-
-Phase 0 is the gate that decides **from-scratch vs seeded** vocabulary (PLAN §A).
+`glyph/forge.py` has the full GRPO forge loop, unit-tested with a fake policy. The
+only missing piece is a real two-adapter LoRA policy (`sample`/`build`/`learn`) —
+which needs a GPU to train (CPU RL over thousands of rollouts is infeasible). On
+Kaggle (T4 x2): wire the policy, run `forge_run` on the curriculum; the cold-start
+probe (`glyph/probe.py`) then decides **from-scratch vs seeded** vocabulary (PLAN §A).
