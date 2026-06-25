@@ -13,12 +13,13 @@ Checkpoints adapters (free tiers wipe disk + cap 12h — re-run resumes from CKP
 """
 import json
 import os
+from itertools import cycle
 
 from glyph.agents import builder_prompt, speaker_prompt
 from glyph.channel import Native
 from glyph.forge import forge_run, reward
 from glyph.policy import LoraPolicy
-from glyph.probe import probe
+from glyph.probe import probe_robust
 from glyph.tasks import load_tasks
 
 MODEL = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
@@ -36,16 +37,20 @@ def main():
         policy.warmup_builder(train, rounds=3)   # §B
         policy.save(CKPT)
 
-    easy = [t for t in train if t["difficulty"] == 0]
+    easy = cycle([t for t in train if t["difficulty"] == 0])
 
     def sample_reward():
-        t = easy[0]
+        t = next(easy)  # cycle the easy tasks for broader coverage
         msg = policy.sample(speaker_prompt(t, ch), 1)[0]
         code = policy.build(builder_prompt(ch.builder_text(msg), t["entry_point"]))
         return float(reward(msg, code, t, ch, lam=0.0)[1])  # pure pass signal
 
-    print("cold-start probe (§A):",
-          json.dumps(probe(sample_reward, groups=8, group_size=8)))
+    gate = probe_robust(sample_reward, runs=5, groups=16, group_size=8)
+    print("cold-start gate (§A):", json.dumps(gate, indent=2))
+    if gate["verdict"] == "seed the vocabulary":
+        print("STOP: no reward variance — seed primitive meanings before forging "
+              "(don't burn GPU-hours on a loop that can't start).")
+        return
 
     def ckpt(step, _m):
         if step % 25 == 24:

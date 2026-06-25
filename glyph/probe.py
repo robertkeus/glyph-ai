@@ -27,16 +27,38 @@ def has_signal(rewards) -> bool:
 
 
 def probe(sample_reward, groups: int = 32, group_size: int = 8) -> dict:
-    """Run the diagnostic. `signal_fraction` = share of groups with a live
-    gradient. Near 0 → from-scratch RL cannot start; seed the vocabulary."""
+    """One diagnostic run. `signal_fraction` = share of groups with a live
+    gradient; `mean_reward` = easy-task pass-rate. Prefer probe_robust for the
+    actual gate — a single run can be a lucky (or unlucky) seed."""
     rewards = [[sample_reward() for _ in range(group_size)] for _ in range(groups)]
-    live = sum(has_signal(g) for g in rewards)
-    overall = mean(r for g in rewards for r in g)
-    frac = live / groups
     return {
         "groups": groups, "group_size": group_size,
-        "mean_reward": overall,
-        "signal_fraction": frac,
-        "verdict": "from-scratch viable" if frac >= VIABLE_FRACTION
-                   else "seed the vocabulary",
+        "mean_reward": mean(r for g in rewards for r in g),
+        "signal_fraction": sum(has_signal(g) for g in rewards) / groups,
+    }
+
+
+def probe_robust(sample_reward, runs: int = 5, groups: int = 16,
+                 group_size: int = 8) -> dict:
+    """The gate (PLAN §A, "never single-run"). Repeat the probe `runs` times and
+    gate the verdict on the WORST run, so a lucky seed can't green-light a forge.
+
+    Reads: signal≈0 with pass-rate 0 or 1 → saturated, no variance to learn from
+    (seed or steepen). signal>0 → a gradient exists → from-scratch can start.
+    """
+    rs = [probe(sample_reward, groups, group_size) for _ in range(runs)]
+    fr = [r["signal_fraction"] for r in rs]
+    pr = [r["mean_reward"] for r in rs]
+    worst = min(fr)
+    if worst >= VIABLE_FRACTION:
+        verdict = "from-scratch viable"
+    elif mean(fr) >= VIABLE_FRACTION:
+        verdict = "borderline — steepen the easy curriculum, re-probe"
+    else:
+        verdict = "seed the vocabulary"
+    return {
+        "runs": runs, "groups": groups, "group_size": group_size,
+        "signal_fraction": {"mean": mean(fr), "min": worst, "max": max(fr)},
+        "easy_pass_rate": {"mean": mean(pr), "min": min(pr), "max": max(pr)},
+        "verdict": verdict,
     }
