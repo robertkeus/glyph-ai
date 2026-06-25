@@ -13,10 +13,12 @@ import re
 from glyph.channel import English, Channel
 from glyph.verifier import run_tests
 
-_CODE = re.compile(r"```(?:python)?\n(.*?)```", re.S)
+_CODE = re.compile(r"```[^\n]*\n(.*?)```", re.S)  # any/no language tag
 
 
 def _extract_code(text: str) -> str:
+    """First fenced block regardless of language tag; raw text if unfenced
+    (unfenced non-code then fails verification — the correct reward)."""
     m = _CODE.search(text)
     return (m.group(1) if m else text).strip()
 

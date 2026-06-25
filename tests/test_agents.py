@@ -1,6 +1,6 @@
 import unittest
 
-from glyph.agents import episode, run
+from glyph.agents import _extract_code, episode, run
 from glyph.channel import Native
 from glyph.tasks import load_tasks
 
@@ -43,6 +43,15 @@ class TestAgents(unittest.TestCase):
         self.assertEqual(e["channel"], "native")
         self.assertEqual(e["message_bytes"], 3 * 2)
         self.assertTrue(e["passed"])
+
+    def test_extract_code_fence_variants(self):
+        for fence in ("python", "py", "Python", ""):  # any/no language tag
+            self.assertEqual(
+                _extract_code(f"sure:\n```{fence}\ndef f(): return 1\n```\ndone"),
+                "def f(): return 1", fence)
+
+    def test_extract_code_unfenced_returns_raw(self):
+        self.assertEqual(_extract_code("def f(): return 1"), "def f(): return 1")
 
     def test_empty_run_summary(self):
         _, s = run([], fake_model({"solution": ""}))
