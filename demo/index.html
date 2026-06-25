@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glyph — a model that forges its own native language, then explains it</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #141821; --edge: #232a37; --ink: #e6e9ef;
+    --dim: #8b94a7; --accent: #7cdfff; --glyph: #ffd166; --pass: #4ade80; --fail: #f87171;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; }
+  header { padding: 2.5rem 1.5rem 1rem; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: clamp(1.4rem, 3vw, 2.1rem); margin: 0 0 .3rem; letter-spacing: -.02em; }
+  .sub { color: var(--dim); max-width: 60ch; }
+  .kill { max-width: 1100px; margin: 1rem auto; padding: .9rem 1.1rem; background: linear-gradient(90deg, #16202b, #141821);
+    border: 1px solid var(--edge); border-left: 3px solid var(--accent); border-radius: 8px; color: var(--dim); font-size: .92rem; }
+  .kill b { color: var(--ink); }
+  main { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 4rem; display: grid; gap: 1rem; }
+  .ep { background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; overflow: hidden; }
+  .ep-head { display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem; border-bottom: 1px solid var(--edge); font-size: .82rem; color: var(--dim); }
+  .badge { font-family: var(--mono); font-size: .72rem; padding: .1rem .5rem; border-radius: 99px; border: 1px solid var(--edge); }
+  .pass { color: var(--pass); border-color: #235; } .fail { color: var(--fail); border-color: #523; }
+  .chan { color: var(--accent); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr 1.2fr; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .col { padding: .9rem; min-width: 0; }
+  .col + .col { border-left: 1px solid var(--edge); }
+  @media (max-width: 760px) { .col + .col { border-left: 0; border-top: 1px solid var(--edge); } }
+  .lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: .45rem; }
+  .task { font-size: .95rem; }
+  .msg { font-family: var(--mono); white-space: pre-wrap; word-break: break-word; font-size: .86rem; color: var(--dim); }
+  .msg.native { font-size: 1.5rem; line-height: 1.7; color: var(--glyph); letter-spacing: .12em; word-break: break-all; }
+  pre { margin: 0; font-family: var(--mono); font-size: .82rem; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
+  .bytes { font-family: var(--mono); color: var(--accent); }
+  footer { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 3rem; color: var(--dim); font-size: .82rem; }
+</style>
+
+<header>
+  <h1>Glyph</h1>
+  <p class="sub">A model whose native tongue is a from-scratch, logographic agent-language. It ingests English, reasons in its own evolved symbols, and emits working code — then explains its language well enough that a cold model can decode it.</p>
+</header>
+<div class="kill">
+  <b>The kill-move.</b> Hand the model's own English explanation of its language to a cold model that has never seen it. If the cold model decodes a fresh native message from that explanation alone, the self-description is load-bearing — autonomy <i>with</i> accountability.
+</div>
+<main id="feed"></main>
+<footer id="foot"></footer>
+
+<script>
+// Embedded sample so the page renders on double-click (file://). When served over
+// HTTP it loads the live ./events.json from a real run_baseline / forge run.
+const SAMPLE = [
+  { task: "op_evens_double", split: "heldout", channel: "english", passed: true, message_bytes: 71,
+    prompt: "Take a list of integers; keep the even numbers, then double each.",
+    message: "Filter the list to even numbers only, then multiply each survivor by two.",
+    code: "def op_evens_double(xs):\n    r = [x for x in xs if x % 2 == 0]\n    return [x * 2 for x in r]" },
+  { task: "op_uniq_sum", split: "heldout", channel: "native", passed: true, message_bytes: 8,
+    prompt: "Take a list of integers; drop duplicates keeping first occurrence, then return their sum.",
+    message: "丗个临丽",
+    code: "def op_uniq_sum(xs):\n    r = list(dict.fromkeys(xs))\n    return sum(r)" },
+  { task: "op_sortd_max", split: "heldout", channel: "native", passed: false, message_bytes: 6,
+    prompt: "Take a list of integers; sort descending, then return the maximum.",
+    message: "三下云",
+    code: "def op_sortd_max(xs):\n    return xs[0]" },
+];
+const NATIVE_NOTE = "Native messages shown are illustrative until the forge runs on a GPU; English entries are from a real baseline run.";
+
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function render(events, live) {
+  const feed = document.getElementById("feed");
+  feed.innerHTML = events.map(e => `
+    <article class="ep">
+      <div class="ep-head">
+        <span class="badge ${e.passed ? "pass" : "fail"}">${e.passed ? "PASS" : "FAIL"}</span>
+        <span class="badge chan">${esc(e.channel || "english")}</span>
+        <span>${esc(e.task || "")} · ${esc(e.split || "")}</span>
+        <span style="margin-left:auto" class="bytes">${e.message_bytes ?? "?"} B</span>
+      </div>
+      <div class="cols">
+        <div class="col"><div class="lbl">English task in</div><div class="task">${esc(e.prompt || "")}</div></div>
+        <div class="col"><div class="lbl">Agent message</div><div class="msg ${e.channel === "native" ? "native" : ""}">${esc(e.message || "")}</div></div>
+        <div class="col"><div class="lbl">Code out</div><pre>${esc(e.code || "")}</pre></div>
+      </div>
+    </article>`).join("");
+  document.getElementById("foot").textContent =
+    (live ? "Loaded live events.json · " : "Embedded sample · ") + NATIVE_NOTE;
+}
+
+fetch("events.json").then(r => r.ok ? r.json() : Promise.reject())
+  .then(d => render(d, true))
+  .catch(() => render(SAMPLE, false));
+</script>

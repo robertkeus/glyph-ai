@@ -17,7 +17,9 @@ Zero dependencies, stdlib only — runs on any `python3`, including Kaggle with 
 | Two-agent runtime (Builder sees message only) | `glyph/agents.py` | ✅ |
 | Cold-start reward-variance probe (the gate) | `glyph/probe.py` | ✅ |
 | Verifier-soundness diagnostic | `smoke.py` | ✅ |
-| Test suite (32 tests, unittest) | `tests/` | ✅ |
+| Test suite (37 tests, unittest) | `tests/` | ✅ |
+| Generated curriculum (67 tasks, 22 held-out) | `glyph/taskgen.py` | ✅ |
+| Interactions-view demo (keynote artifact) | `demo/index.html` | ✅ |
 | Phase 1 forge loop (GRPO, model-agnostic) | `glyph/forge.py` | ✅ |
 | Phase 1 two-adapter LoRA policy + masked channel | `glyph/policy.py` | ✅ executes (CPU smoke) |
 | **English baseline, real model** | `run_baseline.py` | ✅ smoke: 0.833 / 676 B ([RESULTS.md](RESULTS.md)) |
