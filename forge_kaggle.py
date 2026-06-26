@@ -78,6 +78,17 @@ def main():
               "the Builder can't decode the messages.")
         return
 
+    # PLAN test 2 — compositional generalization: held-out tasks reuse the SAME
+    # primitive symbols in NOVEL orders the agents never trained on.
+    held = load_tasks(split="heldout")
+    b_held = sum(grade(_extract_code(policy.build(builder_prompt(
+                 ch.builder_text(canonical_message(t))))), t)["passed"] for t in held)
+    p_held = sum(grade(_extract_code(policy.build(builder_prompt(ch.builder_text(
+                 policy.sample(speaker_prompt(t, ch), 1, greedy=True)[0])))), t)["passed"]
+                 for t in held)
+    print(f"HELD-OUT compositional (test 2): builder_decodes={b_held}/{len(held)}  "
+          f"full_pipeline={p_held}/{len(held)}")
+
     def ckpt(step, _m):
         if step % 25 == 24:
             policy.save(CKPT)
