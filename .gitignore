@@ -7,3 +7,5 @@ models/
 baseline_run.log
 smoke_policy.log
 glyph_ckpt/
+kaggle_kernel/
+out/

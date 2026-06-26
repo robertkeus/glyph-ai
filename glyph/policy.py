@@ -43,14 +43,13 @@ class LoraPolicy:
         self.max_msg, self.min_msg, self.max_code = max_msg, min_msg, max_code
 
         self.tok = AutoTokenizer.from_pretrained(model_name)
-        self.tok.add_tokens(self.channel.glyphs)            # glyphs → single tokens
-        self.sym_ids = self.tok.convert_tokens_to_ids(self.channel.glyphs)
+        # glyphs are ALREADY single Qwen tokens (trained embeddings) — no add/resize
+        self.sym_ids = [self.tok(g, add_special_tokens=False).input_ids[0]
+                        for g in self.channel.glyphs]
         self.sym_set = set(self.sym_ids)
         self.eos = self.tok.eos_token_id
 
-        base = AutoModelForCausalLM.from_pretrained(model_name)
-        base.resize_token_embeddings(len(self.tok))
-        base.to(self.device)
+        base = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         cfg = LoraConfig(r=lora_r, lora_alpha=2 * lora_r, lora_dropout=0.0,
                          target_modules=["q_proj", "v_proj"], task_type="CAUSAL_LM")
         self.model = get_peft_model(base, cfg, adapter_name="speaker")

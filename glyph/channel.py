@@ -1,21 +1,55 @@
 """The Speaker→Builder channel — English (baseline) and Native (forged).
 
 Density is ALWAYS scored in bytes, never tokens (PLAN non-negotiable): a native
-symbol costs SYMBOL_BYTES on the wire regardless of how its demo glyph happens to
-UTF-8 encode. The glyph is a font; the symbol-ID is the language.
+symbol costs SYMBOL_BYTES on the wire regardless of how its glyph UTF-8 encodes.
+
+The native inventory is a fixed set of CJK glyphs that are ALREADY single tokens
+in the Qwen tokenizer — so they carry TRAINED embeddings. (Adding fresh tokens
+gave them random, LoRA-frozen embeddings the agents could never ground.) The
+symbols stay opaque slots; meaning comes from use under the forge, not the glyph.
 """
 from abc import ABC, abstractmethod
 
-SYMBOL_BYTES = 2          # ~2-4k inventory → 2 bytes / symbol-ID
-INVENTORY_SIZE = 2048
-_GLYPH_BASE = 0x4E00      # cosmetic render base (PLAN Open Decision #3); CJK = alien to a Western audience, monospace
+SYMBOL_BYTES = 2  # ~hundreds-sized inventory → 2 bytes / symbol-ID
+
+# CJK codepoints that tokenize to exactly one Qwen token (precomputed, stable).
+_SYMBOL_CPS = (
+    0x4e00, 0x4e01, 0x4e03, 0x4e07, 0x4e08, 0x4e09, 0x4e0a, 0x4e0b, 0x4e0d, 0x4e0e,
+    0x4e0f, 0x4e10, 0x4e11, 0x4e13, 0x4e14, 0x4e15, 0x4e16, 0x4e18, 0x4e19, 0x4e1a,
+    0x4e1b, 0x4e1c, 0x4e1d, 0x4e1e, 0x4e1f, 0x4e22, 0x4e24, 0x4e25, 0x4e26, 0x4e27,
+    0x4e28, 0x4e2a, 0x4e2b, 0x4e2d, 0x4e30, 0x4e32, 0x4e34, 0x4e38, 0x4e39, 0x4e3a,
+    0x4e3b, 0x4e3d, 0x4e3e, 0x4e42, 0x4e43, 0x4e45, 0x4e48, 0x4e49, 0x4e4b, 0x4e4c,
+    0x4e4d, 0x4e4e, 0x4e4f, 0x4e50, 0x4e52, 0x4e53, 0x4e54, 0x4e56, 0x4e57, 0x4e58,
+    0x4e59, 0x4e5c, 0x4e5d, 0x4e5e, 0x4e5f, 0x4e60, 0x4e61, 0x4e66, 0x4e69, 0x4e70,
+    0x4e71, 0x4e73, 0x4e78, 0x4e7e, 0x4e82, 0x4e86, 0x4e88, 0x4e89, 0x4e8b, 0x4e8c,
+    0x4e8d, 0x4e8e, 0x4e8f, 0x4e91, 0x4e92, 0x4e93, 0x4e94, 0x4e95, 0x4e98, 0x4e9a,
+    0x4e9b, 0x4e9e, 0x4e9f, 0x4ea1, 0x4ea2, 0x4ea4, 0x4ea5, 0x4ea6, 0x4ea7, 0x4ea8,
+    0x4ea9, 0x4eab, 0x4eac, 0x4ead, 0x4eae, 0x4eb2, 0x4eb3, 0x4eb5, 0x4eb6, 0x4eb8,
+    0x4eb9, 0x4eba, 0x4ebf, 0x4ec0, 0x4ec1, 0x4ec2, 0x4ec3, 0x4ec4, 0x4ec5, 0x4ec6,
+    0x4ec7, 0x4ec9, 0x4eca, 0x4ecb, 0x4ecd, 0x4ece, 0x4ed1, 0x4ed3, 0x4ed4, 0x4ed5,
+    0x4ed6, 0x4ed7, 0x4ed8, 0x4ed9, 0x4edd, 0x4ede, 0x4edf, 0x4ee1, 0x4ee3, 0x4ee4,
+    0x4ee5, 0x4ee8, 0x4eea, 0x4eeb, 0x4eec, 0x4ef0, 0x4ef2, 0x4ef3, 0x4ef5, 0x4ef6,
+    0x4ef7, 0x4efb, 0x4efd, 0x4eff, 0x4f01, 0x4f08, 0x4f09, 0x4f0a, 0x4f0b, 0x4f0d,
+    0x4f0e, 0x4f0f, 0x4f10, 0x4f11, 0x4f17, 0x4f18, 0x4f19, 0x4f1a, 0x4f1b, 0x4f1d,
+    0x4f1e, 0x4f1f, 0x4f20, 0x4f22, 0x4f23, 0x4f24, 0x4f25, 0x4f26, 0x4f27, 0x4f2a,
+    0x4f2b, 0x4f2d, 0x4f2f, 0x4f30, 0x4f32, 0x4f34, 0x4f36, 0x4f38, 0x4f3a, 0x4f3c,
+    0x4f3d, 0x4f3e, 0x4f41, 0x4f43, 0x4f46, 0x4f48, 0x4f4d, 0x4f4e, 0x4f4f, 0x4f50,
+    0x4f51, 0x4f53, 0x4f54, 0x4f55, 0x4f56, 0x4f57, 0x4f58, 0x4f59, 0x4f5a, 0x4f5b,
+    0x4f5c, 0x4f5d, 0x4f5e, 0x4f5f, 0x4f60, 0x4f63, 0x4f64, 0x4f65, 0x4f69, 0x4f6c,
+    0x4f6f, 0x4f70, 0x4f73, 0x4f74, 0x4f76, 0x4f78, 0x4f7a, 0x4f7b, 0x4f7c, 0x4f7d,
+    0x4f7e, 0x4f7f, 0x4f81, 0x4f82, 0x4f83, 0x4f84, 0x4f86, 0x4f88, 0x4f89, 0x4f8b,
+    0x4f8d, 0x4f8f, 0x4f91, 0x4f94, 0x4f97, 0x4f98, 0x4f9b, 0x4f9d, 0x4fa0, 0x4fa1,
+    0x4fa3, 0x4fa5, 0x4fa6, 0x4fa7, 0x4fa8, 0x4fa9,
+)
+INVENTORY_SIZE = len(_SYMBOL_CPS)  # 256
+_SYMBOL_SET = frozenset(_SYMBOL_CPS)
 
 
 def glyph(sym: int) -> str:
-    """Render a symbol-ID as its demo glyph. Cosmetic only."""
+    """Render a symbol-ID as its (already-tokenized) CJK glyph."""
     if not 0 <= sym < INVENTORY_SIZE:
         raise ValueError(f"symbol {sym} outside 0..{INVENTORY_SIZE - 1}")
-    return chr(_GLYPH_BASE + sym)
+    return chr(_SYMBOL_CPS[sym])
 
 
 def channel_bytes(symbols) -> int:
@@ -27,16 +61,13 @@ class Channel(ABC):
     name: str
 
     @abstractmethod
-    def speaker_hint(self) -> str:
-        """Appended to the Speaker prompt — how to phrase the message."""
+    def speaker_hint(self) -> str: ...
 
     @abstractmethod
-    def builder_text(self, message: str) -> str:
-        """What the Builder actually reads (it never sees the task)."""
+    def builder_text(self, message: str) -> str: ...
 
     @abstractmethod
-    def bytes(self, message: str) -> int:
-        """Honest wire size of the message."""
+    def bytes(self, message: str) -> int: ...
 
 
 class English(Channel):
@@ -63,24 +94,20 @@ class Native(Channel):
         return [glyph(i) for i in range(self.size)]
 
     def is_symbol(self, ch: str) -> bool:
-        return _GLYPH_BASE <= ord(ch) < _GLYPH_BASE + self.size
+        return ord(ch) in _SYMBOL_SET
 
     def speaker_hint(self):
         return "Reply ONLY with channel symbols — no English, no code."
 
     def builder_text(self, message):
-        return message  # glyph string; the real Builder reads the underlying symbol-IDs
+        return message  # glyphs are real Qwen tokens; the Builder reads them directly
 
     def bytes(self, message):
         return channel_bytes([c for c in message if self.is_symbol(c)])
 
     def allowed_token_ids(self, tokenize) -> set:
-        """The hard decode-time mask (PLAN §9): the set of model token-IDs that
-        encode channel glyphs. Speaker generation is restricted to these — zero
-        existing-vocab leakage. `tokenize(str) -> list[int]` is the model's
-        encoder (injected; kept here so the mask LOGIC is GPU-free testable).
-        Only single-token glyphs are admissible.
-        """
+        """Decode-time mask (PLAN §9): the token-IDs of channel glyphs. Each glyph
+        is a single EXISTING Qwen token (trained embedding), so no resize needed."""
         ids = set()
         for g in self.glyphs:
             t = tokenize(g)
