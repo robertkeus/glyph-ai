@@ -26,38 +26,44 @@ MODEL = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
 CKPT = "glyph_ckpt"
 
 
+FAST = bool(os.environ.get("FAST"))  # FAST=1 → ~15-min end-to-end smoke (noisy but real)
+
+
 def main():
     ch = Native()
     train = load_tasks(split="train")
-    policy = LoraPolicy(MODEL, channel=ch)
+    easy = [t for t in train if t["difficulty"] == 0]
+    policy = LoraPolicy(MODEL, channel=ch, max_code=96 if FAST else 256)
+
     if os.path.isdir(CKPT):
         policy.load(CKPT)
         print("resumed from", CKPT)
     else:
-        policy.warmup_builder(train, rounds=3)   # §B
+        policy.warmup_builder(easy if FAST else train, rounds=1 if FAST else 3)  # §B
         policy.save(CKPT)
 
-    easy = cycle([t for t in train if t["difficulty"] == 0])
+    pool = cycle(easy)
 
     def sample_reward():
-        t = next(easy)  # cycle the easy tasks for broader coverage
+        t = next(pool)
         msg = policy.sample(speaker_prompt(t, ch), 1)[0]
         code = policy.build(builder_prompt(ch.builder_text(msg)))
         return float(reward(msg, code, t, ch, lam=0.0)[1])  # pure pass signal
 
-    gate = probe_robust(sample_reward, runs=5, groups=16, group_size=8)
+    g = dict(runs=2, groups=4, group_size=4) if FAST else dict(runs=5, groups=16, group_size=8)
+    gate = probe_robust(sample_reward, **g)
     print("cold-start gate (§A):", json.dumps(gate, indent=2))
     if gate["verdict"] == "seed the vocabulary":
-        print("STOP: no reward variance — seed primitive meanings before forging "
-              "(don't burn GPU-hours on a loop that can't start).")
+        print("STOP: no reward variance — the Builder cannot decode the message, so "
+              "from-scratch can't start. Seed primitive meanings before forging.")
         return
 
     def ckpt(step, _m):
         if step % 25 == 24:
             policy.save(CKPT)
 
-    history = forge_run(train, policy, channel=ch, steps=300, group_size=8,
-                        on_step=ckpt)
+    history = forge_run(train, policy, channel=ch, steps=20 if FAST else 300,
+                        group_size=8, on_step=ckpt)
     policy.save(CKPT)
     print(json.dumps(history[-5:], indent=2))
 
