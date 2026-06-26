@@ -17,7 +17,7 @@ import torch
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, LogitsProcessor
 
-from glyph.agents import builder_prompt, speaker_prompt
+from glyph.agents import builder_prompt, solve_solution, speaker_prompt
 from glyph.channel import Native
 
 
@@ -116,8 +116,8 @@ class LoraPolicy:
         for _ in range(rounds):
             for t in tasks:
                 msg = self.sample(speaker_prompt(t, self.channel), 1)[0]
-                bp = builder_prompt(self.channel.builder_text(msg), t["entry_point"])
-                target = f"```python\n{t['solution']}\n```{self.tok.eos_token}"
+                bp = builder_prompt(self.channel.builder_text(msg))
+                target = f"```python\n{solve_solution(t)}\n```{self.tok.eos_token}"
                 self._sft_builder(bp, target)
 
     def _sft_builder(self, prompt, target):

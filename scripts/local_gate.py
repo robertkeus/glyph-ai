@@ -31,7 +31,7 @@ def main():
     def sr():
         t = next(it)
         msg = p.sample(speaker_prompt(t, ch), 1)[0]
-        code = p.build(builder_prompt(ch.builder_text(msg), t["entry_point"]))
+        code = p.build(builder_prompt(ch.builder_text(msg)))
         return float(reward(msg, code, t, ch, lam=0.0)[1])
 
     print("LOCAL reduced gate:",

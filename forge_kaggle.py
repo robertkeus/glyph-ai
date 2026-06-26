@@ -42,7 +42,7 @@ def main():
     def sample_reward():
         t = next(easy)  # cycle the easy tasks for broader coverage
         msg = policy.sample(speaker_prompt(t, ch), 1)[0]
-        code = policy.build(builder_prompt(ch.builder_text(msg), t["entry_point"]))
+        code = policy.build(builder_prompt(ch.builder_text(msg)))
         return float(reward(msg, code, t, ch, lam=0.0)[1])  # pure pass signal
 
     gate = probe_robust(sample_reward, runs=5, groups=16, group_size=8)

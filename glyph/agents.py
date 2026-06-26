@@ -28,10 +28,26 @@ def speaker_prompt(task, channel: Channel) -> str:
             f"can implement it. {channel.speaker_hint()}\n\nTask: {task['prompt']}")
 
 
-def builder_prompt(message: str, entry_point: str) -> str:
+SOLVE = "solve"  # NEUTRAL builder function name
+
+
+def builder_prompt(message: str) -> str:
     return (f"You are the Builder. Using ONLY the message below, write Python.\n"
-            f"Output ONLY one ```python code block, nothing else. The function "
-            f"MUST be named exactly `{entry_point}`.\n\nMessage:\n{message}")
+            f"Output ONLY one ```python code block defining `def {SOLVE}(xs):` "
+            f"that returns the answer.\n\nMessage:\n{message}")
+
+
+def grade(code: str, task) -> dict:
+    """Alias the Builder's neutral `solve` to the task's entry_point, then run the
+    hidden tests. The entry_point name is NEVER shown to the Builder — a semantic
+    name (e.g. `op_double`) would leak the task and the channel wouldn't be
+    load-bearing. If the Builder didn't define `solve`, the alias NameErrors → fail."""
+    return run_tests(f"{code}\n{task['entry_point']} = {SOLVE}\n", task["tests"])
+
+
+def solve_solution(task) -> str:
+    """The task's reference solution renamed to `solve` — the Builder's SFT target."""
+    return task["solution"].replace(f"def {task['entry_point']}(", f"def {SOLVE}(", 1)
 
 
 def episode(task, generate, channel: Channel = None) -> dict:
@@ -39,8 +55,8 @@ def episode(task, generate, channel: Channel = None) -> dict:
     channel = channel or English()
     message = generate(speaker_prompt(task, channel)).strip()
     builder_in = channel.builder_text(message)
-    code = _extract_code(generate(builder_prompt(builder_in, task["entry_point"])))
-    v = run_tests(code, task["tests"])
+    code = _extract_code(generate(builder_prompt(builder_in)))
+    v = grade(code, task)
     return {
         "task": task["id"], "split": task["split"], "channel": channel.name,
         "prompt": task["prompt"], "message": message, "code": code,

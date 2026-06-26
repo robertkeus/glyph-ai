@@ -10,15 +10,15 @@ policy protocol:
     build(builder_prompt: str) -> str                  # code (Builder; frozen after warmup, PLAN §B)
     learn(speaker_prompt: str, messages, advantages)   # one GRPO update on the Speaker
 """
-from glyph.agents import _extract_code, builder_prompt, speaker_prompt
+from glyph.agents import _extract_code, builder_prompt, grade, speaker_prompt
 from glyph.channel import Native
 from glyph.probe import group_advantages, has_signal
-from glyph.verifier import run_tests
 
 
 def reward(message, code_text, task, channel, lam):
-    """task_success − λ·bytes (PLAN Phase 1). Returns (reward, passed)."""
-    passed = run_tests(_extract_code(code_text), task["tests"])["passed"]
+    """task_success − λ·bytes (PLAN Phase 1). Returns (reward, passed). Grades via
+    the neutral-name alias so the Builder can't read the task from the function name."""
+    passed = grade(_extract_code(code_text), task)["passed"]
     return (1.0 if passed else 0.0) - lam * channel.bytes(message), passed
 
 
@@ -27,8 +27,7 @@ def forge_step(task, policy, channel, lam, group_size=8) -> dict:
     a gradient (PLAN §A: equal rewards → zero advantage → skip)."""
     sp = speaker_prompt(task, channel)
     messages = policy.sample(sp, group_size)
-    pairs = [reward(m, policy.build(builder_prompt(channel.builder_text(m),
-                                                   task["entry_point"])),
+    pairs = [reward(m, policy.build(builder_prompt(channel.builder_text(m))),
                     task, channel, lam) for m in messages]
     rewards = [r for r, _ in pairs]
     signal = has_signal(rewards)

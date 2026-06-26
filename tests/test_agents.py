@@ -1,15 +1,15 @@
 import unittest
 
-from glyph.agents import _extract_code, episode, run
+from glyph.agents import _extract_code, episode, run, solve_solution
 from glyph.channel import Native
 from glyph.tasks import load_tasks
 
 
 def fake_model(task):
-    """Builder returns the reference solution; Speaker echoes the task."""
+    """Builder returns the reference solution (as neutral `solve`); Speaker echoes."""
     def g(prompt):
         if prompt.startswith("You are the Builder"):
-            return f"```python\n{task['solution']}\n```"
+            return f"```python\n{solve_solution(task)}\n```"
         return task["prompt"]
     return g
 
@@ -36,7 +36,7 @@ class TestAgents(unittest.TestCase):
 
         def g(prompt):
             if prompt.startswith("You are the Builder"):
-                return f"```python\n{t['solution']}\n```"
+                return f"```python\n{solve_solution(t)}\n```"
             return msg
 
         e = episode(t, g, channel=n)

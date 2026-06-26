@@ -1,5 +1,6 @@
 import unittest
 
+from glyph.agents import solve_solution
 from glyph.channel import Native, glyph
 from glyph.forge import forge_run, forge_step, lam_for, reward, should_stop
 from glyph.tasks import load_tasks
@@ -19,7 +20,7 @@ class LearningPolicy:
 
     def build(self, builder_prompt):                    # message i = glyph(i)*len
         passes = any(glyph(i) in builder_prompt and i < self.k for i in range(8))
-        return f"```python\n{self.task['solution']}\n```" if passes else "no"
+        return f"```python\n{solve_solution(self.task)}\n```" if passes else "no"
 
     def learn(self, _prompt, _messages, _advantages):
         self.k = min(self.k + 1, 8)
@@ -29,7 +30,7 @@ class TestForge(unittest.TestCase):
     def test_reward_penalizes_bytes(self):
         t = load_tasks()[0]
         ch = Native()
-        good = f"```python\n{t['solution']}\n```"
+        good = f"```python\n{solve_solution(t)}\n```"
         r, ok = reward(glyph(0) * 3, good, t, ch, lam=0.01)
         self.assertTrue(ok)
         self.assertAlmostEqual(r, 1.0 - 0.01 * 3 * 2)   # 3 symbols × 2 bytes
