@@ -37,7 +37,7 @@ def _adapter_params(model, name):
 
 class LoraPolicy:
     def __init__(self, model_name, channel=None, device=None, lr=1e-4,
-                 max_msg=32, min_msg=2, max_code=256, lora_r=8):
+                 max_msg=32, min_msg=1, max_code=256, lora_r=8):
         self.channel = channel or Native()
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.max_msg, self.min_msg, self.max_code = max_msg, min_msg, max_code
@@ -121,18 +121,36 @@ class LoraPolicy:
                 self._sft_builder(bp, target)
 
     def _sft_builder(self, prompt, target):
-        self.model.set_adapter("builder")
+        return self._sft(prompt, target, "builder", self.opt_builder)
+
+    def _sft(self, prompt, target, adapter, opt):
+        """Teacher-force `target` after `prompt` on the given adapter."""
+        self.model.set_adapter(adapter)
         self.model.train()
         p = self.tok(prompt, return_tensors="pt").input_ids.to(self.device)
         full = self.tok(prompt + target, return_tensors="pt").input_ids.to(self.device)
         labels = full.clone()
-        labels[:, :p.shape[1]] = -100  # supervise only the code continuation
-        self.opt_builder.zero_grad()
+        labels[:, :p.shape[1]] = -100  # supervise only the continuation
+        opt.zero_grad()
         loss = self.model(full, labels=labels).loss
         loss.backward()
-        self.opt_builder.step()
+        opt.step()
         self.model.eval()
         return loss.item()
+
+    def warmup_seeded(self, tasks, rounds=2):
+        """Seed both adapters to the grounded code (PLAN §A fallback): Speaker
+        task→canonical symbols, Builder canonical symbols→code. Breaks cold-start."""
+        from glyph.seed import canonical_message
+        eos = self.tok.eos_token
+        for _ in range(rounds):
+            for t in tasks:
+                cm = canonical_message(t)
+                self._sft(speaker_prompt(t, self.channel), cm + eos,
+                          "speaker", self.opt_speaker)
+                self._sft(builder_prompt(self.channel.builder_text(cm)),
+                          f"```python\n{solve_solution(t)}\n```{eos}",
+                          "builder", self.opt_builder)
 
     # --- checkpoint (free tiers wipe disk + cap 12h) ----------------------
     def save(self, path):

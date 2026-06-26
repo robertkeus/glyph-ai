@@ -1,15 +1,19 @@
 """Phase 1 forge run — GPU/Kaggle entry (PLAN §A–E).
 
-Wires the real two-adapter LoRA policy into the forge loop:
-  1. warmup_builder — co-adapt the Builder so the reward is reachable (§B).
-  2. cold-start probe — does the easy curriculum yield reward variance? (§A) The
-     gate that decides from-scratch vs seeded vocabulary.
-  3. forge_run — GRPO-forge the Speaker until the Pareto plateau (§E).
+Default is SEEDED (PLAN §A fallback — from-scratch won't bootstrap: a random
+Speaker emits undecodable symbols, so GRPO gets no within-task gradient). Seeding
+grounds each primitive to a symbol and SFT-warms BOTH agents to that shared code;
+RL then refines/compresses. Set FROMSCRATCH=1 to skip seeding (expect no signal).
+
+  1. warmup_seeded — ground both agents (§A/§B).
+  2. honest within-task gate — can the agents actually solve after warmup?
+  3. forge_run — GRPO-compress the Speaker until the Pareto plateau (§E).
 
 Checkpoints adapters (free tiers wipe disk + cap 12h — re-run resumes from CKPT).
 
-    pip install -r requirements.txt
-    python forge_kaggle.py
+    pip install -q peft
+    python forge_kaggle.py          # full
+    FAST=1 python forge_kaggle.py   # ~15-min smoke
 """
 import json
 import os
@@ -19,14 +23,13 @@ from glyph.agents import builder_prompt, speaker_prompt
 from glyph.channel import Native
 from glyph.forge import forge_run, reward
 from glyph.policy import LoraPolicy
-from glyph.probe import probe_robust
+from glyph.probe import probe_grouped_robust
 from glyph.tasks import load_tasks
 
 MODEL = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
 CKPT = "glyph_ckpt"
-
-
-FAST = bool(os.environ.get("FAST"))  # FAST=1 → ~15-min end-to-end smoke (noisy but real)
+FAST = bool(os.environ.get("FAST"))
+SEEDED = os.environ.get("FROMSCRATCH") is None
 
 
 def main():
@@ -38,24 +41,31 @@ def main():
     if os.path.isdir(CKPT):
         policy.load(CKPT)
         print("resumed from", CKPT)
+    elif SEEDED:
+        policy.warmup_seeded(easy if FAST else train, rounds=1 if FAST else 2)
+        policy.save(CKPT)
     else:
-        policy.warmup_builder(easy if FAST else train, rounds=1 if FAST else 3)  # §B
+        policy.warmup_builder(easy if FAST else train, rounds=1 if FAST else 3)
         policy.save(CKPT)
 
     pool = cycle(easy)
 
-    def sample_reward():
-        t = next(pool)
-        msg = policy.sample(speaker_prompt(t, ch), 1)[0]
-        code = policy.build(builder_prompt(ch.builder_text(msg)))
-        return float(reward(msg, code, t, ch, lam=0.0)[1])  # pure pass signal
+    def draw_group():
+        t = next(pool)  # one task per group → honest within-task variance
+        gs = 4 if FAST else 8
+        out = []
+        for _ in range(gs):
+            msg = policy.sample(speaker_prompt(t, ch), 1)[0]
+            code = policy.build(builder_prompt(ch.builder_text(msg)))
+            out.append(float(reward(msg, code, t, ch, lam=0.0)[1]))  # pure pass
+        return out
 
-    g = dict(runs=2, groups=4, group_size=4) if FAST else dict(runs=5, groups=16, group_size=8)
-    gate = probe_robust(sample_reward, **g)
-    print("cold-start gate (§A):", json.dumps(gate, indent=2))
-    if gate["verdict"] == "seed the vocabulary":
-        print("STOP: no reward variance — the Builder cannot decode the message, so "
-              "from-scratch can't start. Seed primitive meanings before forging.")
+    gate = probe_grouped_robust(draw_group, runs=2 if FAST else 4,
+                                groups=4 if FAST else 12)
+    print("warmup gate:", json.dumps(gate, indent=2))
+    if gate["pass_rate"]["mean"] < 0.3:
+        print("STOP: agents can't solve even after warmup — grounding failed; "
+              "the Builder can't decode the messages.")
         return
 
     def ckpt(step, _m):

@@ -38,6 +38,28 @@ def probe(sample_reward, groups: int = 32, group_size: int = 8) -> dict:
     }
 
 
+def probe_grouped(draw_group, groups: int = 12) -> dict:
+    """Honest gate: `draw_group()` returns the rewards of one SINGLE-TASK group —
+    the within-task variance GRPO actually sees. (Cycling tasks across a group, as
+    probe() does, manufactures cross-task variance that is NOT a usable gradient.)"""
+    gs = [draw_group() for _ in range(groups)]
+    return {
+        "mean_reward": mean(r for g in gs for r in g),
+        "signal_fraction": sum(has_signal(g) for g in gs) / groups,
+    }
+
+
+def probe_grouped_robust(draw_group, runs: int = 4, groups: int = 12) -> dict:
+    rs = [probe_grouped(draw_group, groups) for _ in range(runs)]
+    pr = [r["mean_reward"] for r in rs]
+    sf = [r["signal_fraction"] for r in rs]
+    return {
+        "runs": runs, "groups": groups,
+        "pass_rate": {"mean": mean(pr), "min": min(pr), "max": max(pr)},
+        "within_task_signal": {"mean": mean(sf)},
+    }
+
+
 def probe_robust(sample_reward, runs: int = 5, groups: int = 16,
                  group_size: int = 8) -> dict:
     """The gate (PLAN §A, "never single-run"). Repeat the probe `runs` times and

@@ -1,6 +1,7 @@
 import unittest
 
-from glyph.probe import group_advantages, has_signal, probe, probe_robust
+from glyph.probe import (group_advantages, has_signal, probe, probe_grouped,
+                         probe_grouped_robust, probe_robust)
 
 
 class TestProbe(unittest.TestCase):
@@ -36,6 +37,16 @@ class TestProbe(unittest.TestCase):
         r = probe_robust(lambda: 0.0, runs=3, groups=8, group_size=4)
         self.assertEqual(r["signal_fraction"]["max"], 0.0)
         self.assertEqual(r["verdict"], "seed the vocabulary")
+
+    def test_grouped_all_pass_has_no_within_task_signal(self):
+        r = probe_grouped(lambda: [1.0, 1.0, 1.0, 1.0], groups=4)
+        self.assertEqual(r["mean_reward"], 1.0)
+        self.assertEqual(r["signal_fraction"], 0.0)  # solved but no gradient
+
+    def test_grouped_robust_reports_pass_rate(self):
+        r = probe_grouped_robust(lambda: [0.0, 1.0], runs=2, groups=3)
+        self.assertEqual(r["pass_rate"]["mean"], 0.5)
+        self.assertEqual(r["within_task_signal"]["mean"], 1.0)
 
 
 if __name__ == "__main__":

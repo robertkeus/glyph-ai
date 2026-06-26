@@ -26,8 +26,8 @@ def main():
     p = LoraPolicy(MODEL, channel=ch, max_msg=4, max_code=16, lora_r=4)
     print("init OK — vocab", len(p.tok), "symbols", len(p.sym_ids))
 
-    p.warmup_builder(tasks[:1], rounds=1)
-    print("warmup_builder OK")
+    p.warmup_seeded(tasks[:1], rounds=1)
+    print("warmup_seeded OK")
 
     sp = speaker_prompt(tasks[0], ch)
     msgs = p.sample(sp, 2)
