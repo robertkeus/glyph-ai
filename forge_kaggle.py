@@ -45,7 +45,7 @@ def main():
         policy.load(CKPT)
         print("resumed from", CKPT)
     elif SEEDED:
-        policy.warmup_seeded(train, rounds=14)  # ground solidly at 3B (more → test-2 memorization)
+        policy.warmup_seeded(train, rounds=10)  # 3B balance: 14 destabilized the Speaker (0/16)
         policy.save(CKPT)
     else:
         policy.warmup_builder(train, rounds=1 if FAST else 3)
