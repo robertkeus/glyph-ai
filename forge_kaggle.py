@@ -39,15 +39,16 @@ def main():
     easy = [t for t in train if t["difficulty"] == 0]
     policy = LoraPolicy(MODEL, channel=ch, max_code=96 if FAST else 256)
 
-    warm = easy if FAST else train
+    # Always warm on train (singletons ground each symbol→line; compositions teach
+    # concatenation) — easy-only can't produce compositional decoding (test 2).
     if os.path.isdir(CKPT):
         policy.load(CKPT)
         print("resumed from", CKPT)
     elif SEEDED:
-        policy.warmup_seeded(warm, rounds=30 if FAST else 12)  # SFT memorizes tiny mappings → needs epochs
+        policy.warmup_seeded(train, rounds=12)  # SFT memorizes tiny mappings → needs epochs
         policy.save(CKPT)
     else:
-        policy.warmup_builder(warm, rounds=1 if FAST else 3)
+        policy.warmup_builder(train, rounds=1 if FAST else 3)
         policy.save(CKPT)
 
     # Diagnostic: isolate the two grounding halves (greedy, on the canonical msg).
