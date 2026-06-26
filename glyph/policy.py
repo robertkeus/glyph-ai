@@ -50,6 +50,7 @@ class LoraPolicy:
         self.eos = self.tok.eos_token_id
 
         base = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
+        vocab = base.config.vocab_size  # padded (151936) ≠ len(tok) — mask must match logits
         cfg = LoraConfig(r=lora_r, lora_alpha=2 * lora_r, lora_dropout=0.0,
                          target_modules=["q_proj", "v_proj"], task_type="CAUSAL_LM")
         self.model = get_peft_model(base, cfg, adapter_name="speaker")
@@ -57,7 +58,7 @@ class LoraPolicy:
         for n, p in self.model.named_parameters():  # add_adapter leaves builder frozen
             if "lora" in n:
                 p.requires_grad_(True)
-        self.mask = _SymbolMask(self.sym_set | {self.eos}, len(self.tok), self.device)
+        self.mask = _SymbolMask(self.sym_set | {self.eos}, vocab, self.device)
         self.opt_speaker = torch.optim.AdamW(_adapter_params(self.model, "speaker"), lr=lr)
         self.opt_builder = torch.optim.AdamW(_adapter_params(self.model, "builder"), lr=lr)
 
