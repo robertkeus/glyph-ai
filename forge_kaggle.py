@@ -27,7 +27,7 @@ from glyph.probe import probe_grouped_robust
 from glyph.seed import canonical_message
 from glyph.tasks import load_tasks
 
-MODEL = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct"  # 3B: capacity for the compositional rule + metalinguistic (test 3)
 CKPT = "glyph_ckpt"
 FAST = bool(os.environ.get("FAST"))
 SEEDED = os.environ.get("FROMSCRATCH") is None
