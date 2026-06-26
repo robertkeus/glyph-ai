@@ -64,14 +64,15 @@ class LoraPolicy:
 
     # --- forge.py protocol -------------------------------------------------
     @torch.no_grad()
-    def sample(self, prompt, n):
+    def sample(self, prompt, n, greedy=False):
         self.model.set_adapter("speaker")
         self.model.eval()
         enc = self.tok(prompt, return_tensors="pt").to(self.device)
+        kw = dict(do_sample=False, num_return_sequences=1) if greedy else \
+            dict(do_sample=True, temperature=1.0, top_k=0, num_return_sequences=n)
         out = self.model.generate(
             **enc, max_new_tokens=self.max_msg, min_new_tokens=self.min_msg,
-            do_sample=True, temperature=1.0, top_k=0, num_return_sequences=n,
-            logits_processor=[self.mask], pad_token_id=self.eos)
+            logits_processor=[self.mask], pad_token_id=self.eos, **kw)
         plen = enc.input_ids.shape[1]
         return [self.tok.decode([t for t in row[plen:].tolist() if t in self.sym_set])
                 for row in out]
