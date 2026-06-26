@@ -44,7 +44,7 @@ def main():
         policy.load(CKPT)
         print("resumed from", CKPT)
     elif SEEDED:
-        policy.warmup_seeded(warm, rounds=15 if FAST else 8)  # SFT memorizes tiny mappings → needs epochs
+        policy.warmup_seeded(warm, rounds=30 if FAST else 12)  # SFT memorizes tiny mappings → needs epochs
         policy.save(CKPT)
     else:
         policy.warmup_builder(warm, rounds=1 if FAST else 3)
