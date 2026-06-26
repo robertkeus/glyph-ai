@@ -38,6 +38,7 @@ def _adapter_params(model, name):
 class LoraPolicy:
     def __init__(self, model_name, channel=None, device=None, lr=2e-4,
                  max_msg=32, min_msg=1, max_code=256, lora_r=16):
+        torch.manual_seed(0)  # reproducibility (PLAN: fix seeds, report variance)
         self.channel = channel or Native()
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.max_msg, self.min_msg, self.max_code = max_msg, min_msg, max_code
@@ -51,7 +52,7 @@ class LoraPolicy:
 
         base = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         vocab = base.config.vocab_size  # padded (151936) ≠ len(tok) — mask must match logits
-        cfg = LoraConfig(r=lora_r, lora_alpha=2 * lora_r, lora_dropout=0.0,
+        cfg = LoraConfig(r=lora_r, lora_alpha=2 * lora_r, lora_dropout=0.1,  # regularize → generalize, not memorize
                          target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
                                          "gate_proj", "up_proj", "down_proj"],
                          task_type="CAUSAL_LM")
