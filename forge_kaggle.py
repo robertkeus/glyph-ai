@@ -96,16 +96,22 @@ def main():
     # decodes the single-symbol message → its operation), then a COLD base model
     # (adapters OFF — never learned the language) must decode held-out messages
     # from that explanation alone. Load-bearing self-description.
+    def operation(code):  # the single statement the symbol means (from Builder's solve)
+        ops = [l.strip() for l in code.splitlines()
+               if l.strip() and not l.strip().startswith("def ")
+               and l.strip() != "r = list(xs)" and l.strip() != "return r"]
+        return ops[0] if ops else "pass"
+
     expl = "\n".join(
-        f"Symbol {prim_symbol(p)} means this operation on a list:\n"
-        f"{_extract_code(policy.build(builder_prompt(ch.builder_text(prim_symbol(p)))))}\n"
+        f"{prim_symbol(p)} : {operation(_extract_code(policy.build(builder_prompt(ch.builder_text(prim_symbol(p))))))}"
         for p in PRIM_ORDER)
 
     def cold_prompt(msg):
-        return ("Each symbol below names a Python operation on a list.\n\n" + expl +
-                "\nWrite `def solve(xs):` that applies the operations for the symbols "
-                "below IN ORDER and returns the result. Output one ```python block.\n"
-                f"Symbols: {msg}")
+        return ("Each symbol maps to one Python statement on a list `r`:\n\n" + expl +
+                "\n\nDefine solve(xs): begin with `r = list(xs)`, then apply the "
+                "statements for these symbols IN ORDER (a statement starting with "
+                "`return` gives the final result; otherwise end with `return r`). "
+                f"Output one ```python block.\nSymbols: {msg}")
 
     c3 = sum(grade(_extract_code(policy.build(cold_prompt(canonical_message(t)), cold=True)),
                    t)["passed"] for t in held)
