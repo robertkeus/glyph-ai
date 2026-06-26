@@ -1,0 +1,4 @@
+# Kaggle/CUDA: torch, transformers, numpy are PREINSTALLED and CUDA-matched.
+# Only add peft. Do NOT install the local requirements.txt here (its numpy<2
+# pin downgrades Kaggle numpy and breaks CUDA torch).
+peft

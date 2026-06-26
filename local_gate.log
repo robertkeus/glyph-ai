@@ -1,0 +1,5 @@
+'(ProtocolError('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')), '(Request ID: 460cf4f0-1cd5-4da2-ba80-afddaf8413f6)')' thrown while requesting HEAD https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct/resolve/main/generation_config.json
+Retrying in 1s [Retry 1/5].
+The new embeddings will be initialized from a multivariate normal distribution that has old embeddings' mean and covariance. As described in this article: https://nlp.stanford.edu/~johnhew/vocab-expansion.html. To disable this, use `mean_resizing=False`
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+LOCAL reduced gate: {"runs": 2, "groups": 4, "group_size": 4, "signal_fraction": {"mean": 0.625, "min": 0.5, "max": 0.75}, "easy_pass_rate": {"mean": 0.1875, "min": 0.1875, "max": 0.1875}, "verdict": "from-scratch viable"}

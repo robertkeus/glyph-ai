@@ -40,9 +40,13 @@ warmup, GRPO backward, checkpointing. Convergence and the §A/§D tuning are the
 research — they need a GPU (CPU RL over thousands of rollouts is infeasible).
 
 ```bash
-pip install -r requirements.txt
+# On Kaggle (CUDA): torch/transformers/numpy are preinstalled — only add peft.
+# Do NOT use requirements.txt here (its numpy<2 pin breaks Kaggle's CUDA torch).
+pip install -q peft
 python forge_kaggle.py     # warmup builder (§B) → cold-start probe (§A) → forge_run (§E)
 ```
+
+(`requirements.txt` is for a local CPU run; `requirements-kaggle.txt` documents the Kaggle path.)
 
 `forge_kaggle.py` warms up the Builder so reward is reachable (§B), runs the
 cold-start probe that decides **from-scratch vs seeded** vocabulary (§A), then
