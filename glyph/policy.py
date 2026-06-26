@@ -13,6 +13,8 @@ RUNNABLE SCAFFOLD. Smoke-tested end-to-end on CPU (scripts/smoke_policy.py): the
 training code executes (forward, mask, backward, optimizer step). Convergence and
 the §A cold-start / §D λ tuning are the open research — needs a GPU to train.
 """
+from contextlib import nullcontext
+
 import torch
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, LogitsProcessor
@@ -81,12 +83,16 @@ class LoraPolicy:
                 for row in out]
 
     @torch.no_grad()
-    def build(self, prompt):
+    def build(self, prompt, cold=False):
+        """cold=True disables all adapters → the bare base model, which never
+        learned the language (the test-3 cold decoder, PLAN headline)."""
         self.model.set_adapter("builder")
         self.model.eval()
         enc = self.tok(prompt, return_tensors="pt").to(self.device)
-        out = self.model.generate(**enc, max_new_tokens=self.max_code,
-                                  do_sample=False, pad_token_id=self.eos)
+        ctx = self.model.disable_adapter() if cold else nullcontext()
+        with ctx:
+            out = self.model.generate(**enc, max_new_tokens=self.max_code,
+                                      do_sample=False, pad_token_id=self.eos)
         return self.tok.decode(out[0][enc.input_ids.shape[1]:].cpu(),
                                skip_special_tokens=True)
 

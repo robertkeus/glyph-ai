@@ -24,7 +24,7 @@ from glyph.channel import Native
 from glyph.forge import forge_run, reward
 from glyph.policy import LoraPolicy
 from glyph.probe import probe_grouped_robust
-from glyph.seed import canonical_message
+from glyph.seed import PRIM_ORDER, canonical_message, prim_symbol
 from glyph.tasks import load_tasks
 
 MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct"  # 3B: capacity for the compositional rule + metalinguistic (test 3)
@@ -37,7 +37,7 @@ def main():
     ch = Native()
     train = load_tasks(split="train")
     easy = [t for t in train if t["difficulty"] == 0]
-    policy = LoraPolicy(MODEL, channel=ch, max_code=96 if FAST else 256)
+    policy = LoraPolicy(MODEL, channel=ch, max_code=160 if FAST else 256)
 
     # Always warm on train (singletons ground each symbol→line; compositions teach
     # concatenation) — easy-only can't produce compositional decoding (test 2).
@@ -45,7 +45,7 @@ def main():
         policy.load(CKPT)
         print("resumed from", CKPT)
     elif SEEDED:
-        policy.warmup_seeded(train, rounds=10)  # enough to ground; more → memorization, worse test 2
+        policy.warmup_seeded(train, rounds=14)  # ground solidly at 3B (more → test-2 memorization)
         policy.save(CKPT)
     else:
         policy.warmup_builder(train, rounds=1 if FAST else 3)
@@ -91,6 +91,25 @@ def main():
             fails.append("+".join(t["primitives"]))
     print(f"HELD-OUT compositional (test 2): builder_decodes={b}/{len(held)}")
     print("  fails:", ", ".join(fails))
+
+    # PLAN test 3 (HEADLINE): the model EXPLAINS each symbol itself (the Builder
+    # decodes the single-symbol message → its operation), then a COLD base model
+    # (adapters OFF — never learned the language) must decode held-out messages
+    # from that explanation alone. Load-bearing self-description.
+    expl = "\n".join(
+        f"Symbol {prim_symbol(p)} means this operation on a list:\n"
+        f"{_extract_code(policy.build(builder_prompt(ch.builder_text(prim_symbol(p)))))}\n"
+        for p in PRIM_ORDER)
+
+    def cold_prompt(msg):
+        return ("Each symbol below names a Python operation on a list.\n\n" + expl +
+                "\nWrite `def solve(xs):` that applies the operations for the symbols "
+                "below IN ORDER and returns the result. Output one ```python block.\n"
+                f"Symbols: {msg}")
+
+    c3 = sum(grade(_extract_code(policy.build(cold_prompt(canonical_message(t)), cold=True)),
+                   t)["passed"] for t in held)
+    print(f"TEST 3 self-explanation (cold decodes held-out): {c3}/{len(held)}")
 
     def ckpt(step, _m):
         if step % 25 == 24:
