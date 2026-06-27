@@ -113,8 +113,16 @@ def main():
                 "`return` gives the final result; otherwise end with `return r`). "
                 f"Output one ```python block.\nSymbols: {msg}")
 
-    c3 = sum(grade(_extract_code(policy.build(cold_prompt(canonical_message(t)), cold=True)),
-                   t)["passed"] for t in held)
+    print("=== EXPLANATION (model's own per-symbol meanings) ===")
+    print(expl)
+    c3 = 0
+    for i, t in enumerate(held):
+        out = _extract_code(policy.build(cold_prompt(canonical_message(t)), cold=True))
+        ok = grade(out, t)["passed"]
+        c3 += ok
+        if i < 3:
+            print(f"--- {t['id']} {t['primitives']} msg={canonical_message(t)} pass={ok}")
+            print("COLD:", out[:200].replace(chr(10), " | "))
     print(f"TEST 3 self-explanation (cold decodes held-out): {c3}/{len(held)}")
 
     def ckpt(step, _m):
