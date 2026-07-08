@@ -191,9 +191,8 @@ class LoraPolicy:
     _ADAPTERS = ("speaker", "builder", "translator")
 
     def save(self, path):
-        import os
-        for name in self._ADAPTERS:  # one subdir per adapter (peft needs this to reload each)
-            self.model.save_pretrained(os.path.join(path, name), selected_adapters=[name])
+        # one call → path/<name>/ per adapter (per-name calls double-nest)
+        self.model.save_pretrained(path, selected_adapters=list(self._ADAPTERS))
 
     def load(self, path):
         import os
