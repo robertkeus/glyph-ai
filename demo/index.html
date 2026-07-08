@@ -68,6 +68,18 @@ const NATIVE_NOTE = "Native messages shown are illustrative until the forge runs
 
 const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
+function banner(sum) {
+  if (!sum || sum.byte_reduction_pct == null) return;
+  const k = document.querySelector(".kill");
+  const b = document.createElement("div");
+  b.className = "kill";
+  b.innerHTML = `<b>Measured on this run:</b> native channel uses ` +
+    `<b style="color:var(--pass)">${sum.byte_reduction_pct.toFixed(1)}% fewer bytes</b> ` +
+    `per solved task than the same agents talking English ` +
+    `(${sum.native.bytes_per_solved?.toFixed(0)} B vs ${sum.english.bytes_per_solved?.toFixed(0)} B).`;
+  k.after(b);
+}
+
 function render(events, live) {
   const feed = document.getElementById("feed");
   feed.innerHTML = events.map(e => `
@@ -80,7 +92,7 @@ function render(events, live) {
       </div>
       <div class="cols">
         <div class="col"><div class="lbl">English task in</div><div class="task">${esc(e.prompt || "")}</div></div>
-        <div class="col"><div class="lbl">Agent message</div><div class="msg ${e.channel === "native" ? "native" : ""}">${esc(e.message || "")}</div></div>
+        <div class="col"><div class="lbl">Agent message</div><div class="msg ${e.channel === "native" ? "native" : ""}">${esc(e.message || "")}</div>${e.english ? `<div class="lbl" style="margin-top:.6rem">Model's own translation</div><div class="msg">${esc(e.english)}</div>` : ""}</div>
         <div class="col"><div class="lbl">Code out</div><pre>${esc(e.code || "")}</pre></div>
       </div>
     </article>`).join("");
@@ -89,6 +101,10 @@ function render(events, live) {
 }
 
 fetch("events.json").then(r => r.ok ? r.json() : Promise.reject())
-  .then(d => render(d, true))
+  .then(d => {
+    const events = Array.isArray(d) ? d : d.events;   // old flat / new {summary, events}
+    if (!Array.isArray(d)) banner(d.summary);
+    render(events, true);
+  })
   .catch(() => render(SAMPLE, false));
 </script>
