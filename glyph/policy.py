@@ -61,12 +61,14 @@ class LoraPolicy:
                          task_type="CAUSAL_LM")
         self.model = get_peft_model(base, cfg, adapter_name="speaker")
         self.model.add_adapter("builder", cfg)
-        for n, p in self.model.named_parameters():  # add_adapter leaves builder frozen
+        self.model.add_adapter("translator", cfg)  # glyphs→English; separate from builder or they interfere
+        for n, p in self.model.named_parameters():  # add_adapter leaves extras frozen
             if "lora" in n:
                 p.requires_grad_(True)
         self.mask = _SymbolMask(self.sym_set | {self.eos}, vocab, self.device)
         self.opt_speaker = torch.optim.AdamW(_adapter_params(self.model, "speaker"), lr=lr)
         self.opt_builder = torch.optim.AdamW(_adapter_params(self.model, "builder"), lr=lr)
+        self.opt_translator = torch.optim.AdamW(_adapter_params(self.model, "translator"), lr=lr)
 
     # --- forge.py protocol -------------------------------------------------
     @torch.no_grad()
@@ -172,12 +174,12 @@ class LoraPolicy:
                           "builder", self.opt_builder)
                 if translate:
                     self._sft(translate_prompt(cm), " " + t["prompt"] + eos,
-                              "builder", self.opt_builder)
+                              "translator", self.opt_translator)
 
     @torch.no_grad()
     def translate(self, message: str) -> str:
-        """Glyphs → English (builder adapter, translate prompt)."""
-        self.model.set_adapter("builder")
+        """Glyphs → English (translator adapter)."""
+        self.model.set_adapter("translator")
         self.model.eval()
         enc = self.tok(translate_prompt(message), return_tensors="pt").to(self.device)
         out = self.model.generate(**enc, max_new_tokens=64, do_sample=False,
@@ -190,5 +192,5 @@ class LoraPolicy:
         self.model.save_pretrained(path)
 
     def load(self, path):
-        self.model.load_adapter(path, adapter_name="speaker")
-        self.model.load_adapter(path, adapter_name="builder")
+        for name in ("speaker", "builder", "translator"):
+            self.model.load_adapter(path, adapter_name=name)
