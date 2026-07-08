@@ -88,6 +88,10 @@ function banner(sum) {
 }
 
 function render(events, live) {
+  const nativePass = new Set(events.filter(e => e.channel === "native" && e.passed).map(e => e.task));
+  // pairs where the native channel SUCCEEDED lead; within a task, native before English
+  const rank = e => (nativePass.has(e.task) ? "0" : "1") + (e.task || "") + (e.channel === "native" ? "0" : "1");
+  events = [...events].sort((a, b) => rank(a).localeCompare(rank(b)));
   const feed = document.getElementById("feed");
   feed.innerHTML = events.map(e => `
     <article class="ep">
