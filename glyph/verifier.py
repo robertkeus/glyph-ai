@@ -40,7 +40,8 @@ def run_tests(candidate: str, tests: str, timeout: float = 5.0) -> dict:
             preexec_fn=_limits if os.name == "posix" else None,
         )
         return {"passed": p.returncode == 0,
-                "detail": p.stderr.strip()[-500:] if p.returncode else ""}
+                "detail": p.stderr.strip()[-500:] if p.returncode else "",
+                "stdout": p.stdout.strip()[-500:]}
     except subprocess.TimeoutExpired:
         return {"passed": False, "detail": "timeout"}
     finally:
