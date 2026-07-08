@@ -64,9 +64,14 @@ def _resolve_adapters(root):
     return os.path.dirname(os.path.dirname(hits[0]))
 
 
-def launch(adapters=None, rounds=10, share=True):
-    """adapters=<dir> loads a trained checkpoint (seconds); else warms up (~15 min)."""
+def launch(adapters="auto", rounds=10, share=True):
+    """adapters=<dir> loads a trained checkpoint (seconds); "auto" uses the attached
+    glyph-adapters dataset if present; None forces a fresh warmup (~15 min)."""
+    import glob
     global P
+    if adapters == "auto":
+        adapters = "/kaggle/input" if glob.glob(
+            "/kaggle/input/**/speaker/adapter_config.json", recursive=True) else None
     P = LoraPolicy(MODEL, channel=CH)
     if adapters:
         P.load(_resolve_adapters(adapters))

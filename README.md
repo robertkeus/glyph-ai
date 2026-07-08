@@ -32,6 +32,24 @@ python run_baseline.py        # real model → pass_rate + bytes_per_solved (see
 Baseline cleared the bar (0.833 ≥ 0.7) — the harness is proven end-to-end with a
 real model. `bytes_per_solved=676` is the number the forged native channel must beat.
 
+## Talk to it (production, instant start)
+
+Trained adapters are published as the Kaggle dataset `robertkeus/glyph-adapters`.
+In a Kaggle notebook (GPU T4, Internet on) → Add Input → that dataset:
+
+```python
+!git clone https://github.com/robertkeus/glyph-ai && %cd glyph-ai
+!pip -q install peft gradio
+import chat_app; chat_app.launch()      # auto-loads the dataset → chat URL in ~2 min
+```
+
+Loads pre-trained adapters (no 15-min warmup) and prints a public Gradio URL.
+Type a list-of-integers request or glyphs; it replies in glyphs + working code.
+Retrain from scratch instead: `python train_and_save.py` (saves new adapters).
+
+Numbers (3B, seed=0): compositional decode 12/22 · Speaker on unseen English
+22/45 · native channel **98.8% fewer bytes** than English A2A ([RESULTS.md](RESULTS.md)).
+
 ## Phase 1 — run the forge on a GPU
 
 The full pipeline is built and the training code is **verified to execute** end to
