@@ -53,12 +53,23 @@ def _respond(msg, _history):
     return "\n\n".join(out)
 
 
+def _resolve_adapters(root):
+    """Find the dir containing speaker/ builder/ translator/ under root (robust to
+    Kaggle dataset mount nesting)."""
+    import glob, os
+    hits = glob.glob(os.path.join(root, "**", "speaker", "adapter_config.json"),
+                     recursive=True)
+    if not hits:
+        raise FileNotFoundError(f"no adapters under {root}")
+    return os.path.dirname(os.path.dirname(hits[0]))
+
+
 def launch(adapters=None, rounds=10, share=True):
     """adapters=<dir> loads a trained checkpoint (seconds); else warms up (~15 min)."""
     global P
     P = LoraPolicy(MODEL, channel=CH)
     if adapters:
-        P.load(adapters)
+        P.load(_resolve_adapters(adapters))
     else:
         P.warmup_seeded(load_tasks(split="train"), rounds=rounds,
                         english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True)
