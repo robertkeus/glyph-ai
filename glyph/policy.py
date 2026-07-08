@@ -188,11 +188,16 @@ class LoraPolicy:
                                skip_special_tokens=True).strip()
 
     # --- checkpoint (free tiers wipe disk + cap 12h) ----------------------
+    _ADAPTERS = ("speaker", "builder", "translator")
+
     def save(self, path):
-        self.model.save_pretrained(path)
+        import os
+        for name in self._ADAPTERS:  # one subdir per adapter (peft needs this to reload each)
+            self.model.save_pretrained(os.path.join(path, name), selected_adapters=[name])
 
     def load(self, path):
-        for name in ("speaker", "builder", "translator"):
+        import os
+        for name in self._ADAPTERS:
             if name in self.model.peft_config:
                 self.model.delete_adapter(name)  # overwrite the fresh-init adapter
-            self.model.load_adapter(path, adapter_name=name)
+            self.model.load_adapter(os.path.join(path, name), adapter_name=name)
