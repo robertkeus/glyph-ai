@@ -19,7 +19,8 @@ import json
 import os
 from itertools import cycle
 
-from glyph.agents import _extract_code, builder_prompt, grade, speaker_prompt
+from glyph.agents import (_extract_code, builder_prompt, grade, solve_solution,
+                          speaker_prompt)
 from glyph.channel import Native
 from glyph.forge import forge_run, reward
 from glyph.policy import LoraPolicy
