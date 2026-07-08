@@ -1,4 +1,4 @@
-from demo_interactive import setup, show, held
-setup()
-for t in held()[:6]:
-    show(t)
+from chat import start, say
+start()
+print("\n>>> user: keep the even number then double each")
+say("keep the even number then double each")
