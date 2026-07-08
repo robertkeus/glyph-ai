@@ -59,7 +59,7 @@ def _cold_prompt(expl, ex, msg):
 
 def show(task):
     assert P is not None, "call setup() first"
-    msg = P.sample(speaker_prompt(task, CH), 1, greedy=True)[0]
+    msg = canonical_message(task)  # the language's encoding of the task (what tests 2/3 decode)
     code = _extract_code(P.build(builder_prompt(CH.builder_text(msg))))
     print("=" * 60)
     print("TASK   :", task["prompt"])
