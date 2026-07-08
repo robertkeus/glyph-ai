@@ -19,7 +19,8 @@ import torch
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, LogitsProcessor
 
-from glyph.agents import builder_prompt, solve_solution, speaker_prompt
+from glyph.agents import (builder_prompt, solve_solution, speaker_prompt,
+                          translate_prompt)
 from glyph.channel import Native
 
 
@@ -151,19 +152,38 @@ class LoraPolicy:
         self.model.eval()
         return loss.item()
 
-    def warmup_seeded(self, tasks, rounds=2):
+    def warmup_seeded(self, tasks, rounds=2, english=None, translate=False):
         """Seed both adapters to the grounded code (PLAN §A fallback): Speaker
-        task→canonical symbols, Builder canonical symbols→code. Breaks cold-start."""
+        task→canonical symbols, Builder canonical symbols→code. Breaks cold-start.
+
+        Phase 2 anchor (optional): `english(task, round)` supplies a paraphrased
+        prompt per round (Speaker robustness to unseen phrasings); translate=True
+        also SFTs glyphs→English on the builder adapter (English out)."""
         from glyph.seed import canonical_message
         eos = self.tok.eos_token
-        for _ in range(rounds):
+        for rd in range(rounds):
             for t in tasks:
                 cm = canonical_message(t)
-                self._sft(speaker_prompt(t, self.channel), cm + eos,
+                spk_task = dict(t, prompt=english(t, rd)) if english else t
+                self._sft(speaker_prompt(spk_task, self.channel), cm + eos,
                           "speaker", self.opt_speaker)
                 self._sft(builder_prompt(self.channel.builder_text(cm)),
                           f"```python\n{solve_solution(t)}\n```{eos}",
                           "builder", self.opt_builder)
+                if translate:
+                    self._sft(translate_prompt(cm), " " + t["prompt"] + eos,
+                              "builder", self.opt_builder)
+
+    @torch.no_grad()
+    def translate(self, message: str) -> str:
+        """Glyphs → English (builder adapter, translate prompt)."""
+        self.model.set_adapter("builder")
+        self.model.eval()
+        enc = self.tok(translate_prompt(message), return_tensors="pt").to(self.device)
+        out = self.model.generate(**enc, max_new_tokens=64, do_sample=False,
+                                  pad_token_id=self.eos)
+        return self.tok.decode(out[0][enc.input_ids.shape[1]:].cpu(),
+                               skip_special_tokens=True).strip()
 
     # --- checkpoint (free tiers wipe disk + cap 12h) ----------------------
     def save(self, path):

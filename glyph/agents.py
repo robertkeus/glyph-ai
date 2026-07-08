@@ -31,6 +31,11 @@ def speaker_prompt(task, channel: Channel) -> str:
 SOLVE = "solve"  # NEUTRAL builder function name
 
 
+def translate_prompt(message: str) -> str:
+    return (f"Translate this symbol message into one English instruction.\n"
+            f"Symbols: {message}\nEnglish:")
+
+
 def builder_prompt(message: str) -> str:
     return (f"You are the Builder. Using ONLY the message below, write Python.\n"
             f"Output ONLY one ```python code block defining `def {SOLVE}(xs):` "
