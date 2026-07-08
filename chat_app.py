@@ -28,16 +28,23 @@ P = None
 def _respond(msg, _history):
     if P is None:
         return "Model still warming up — try again in a moment."
-    msg = msg.strip()
-    if msg and all(CH.is_symbol(c) for c in msg):        # user typed glyphs
-        glyphs, translation = msg, P.translate(msg)
-    else:                                                # user typed English
-        task = {"prompt": f"Take a list of integers; {msg.rstrip('.')}."}
-        glyphs = P.sample(speaker_prompt(task, CH), 1, greedy=True)[0]
-        translation = None
-    code = _extract_code(P.build(builder_prompt(CH.builder_text(glyphs))))
-    r = run_tests(code, f"print(solve({DEMO_INPUT}))")
-    ran = r["stdout"] if r["passed"] else "error: " + r["detail"][:80]
+    msg = (msg or "").strip()[:200]
+    if not msg:
+        return "Ask for a list-of-integers operation, e.g. *keep the even numbers, then double each*."
+    try:
+        if all(CH.is_symbol(c) for c in msg):            # user typed glyphs
+            glyphs, translation = msg, P.translate(msg)
+        else:                                            # user typed English
+            task = {"prompt": f"Take a list of integers; {msg.rstrip('.')}."}
+            glyphs = P.sample(speaker_prompt(task, CH), 1, greedy=True)[0]
+            translation = None
+        if not glyphs:
+            return "The Speaker couldn't encode that — try phrasing it like the examples."
+        code = _extract_code(P.build(builder_prompt(CH.builder_text(glyphs))))
+        r = run_tests(code, f"print(solve({DEMO_INPUT}))")
+        ran = r["stdout"] if r["passed"] else "error: " + r["detail"][:80]
+    except Exception as e:  # never crash the chat
+        return f"Error: {type(e).__name__}: {e}"
     out = [f"**glyph** `{glyphs}`  ·  {CH.bytes(glyphs)} bytes"]
     if translation:
         out.append(f"**model reads it as:** {translation}")
@@ -46,11 +53,15 @@ def _respond(msg, _history):
     return "\n\n".join(out)
 
 
-def launch(rounds=10, share=True):
+def launch(adapters=None, rounds=10, share=True):
+    """adapters=<dir> loads a trained checkpoint (seconds); else warms up (~15 min)."""
     global P
     P = LoraPolicy(MODEL, channel=CH)
-    P.warmup_seeded(load_tasks(split="train"), rounds=rounds,
-                    english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True)
+    if adapters:
+        P.load(adapters)
+    else:
+        P.warmup_seeded(load_tasks(split="train"), rounds=rounds,
+                        english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True)
     import gradio as gr
     ex = [t["prompt"].split("; ", 1)[1] for t in load_tasks(split="heldout")[:6]]
     gr.ChatInterface(

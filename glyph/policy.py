@@ -193,4 +193,6 @@ class LoraPolicy:
 
     def load(self, path):
         for name in ("speaker", "builder", "translator"):
+            if name in self.model.peft_config:
+                self.model.delete_adapter(name)  # overwrite the fresh-init adapter
             self.model.load_adapter(path, adapter_name=name)
