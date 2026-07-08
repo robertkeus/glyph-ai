@@ -68,6 +68,13 @@ const NATIVE_NOTE = "Native messages shown are illustrative until the forge runs
 
 const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
+// Display-only skin (PLAN: "the glyph is a font, the ID is the language").
+// The wire symbols are CJK chars (single Qwen tokens with trained embeddings —
+// required for learnability); rendered as Canadian-syllabics so the language
+// reads as alien to any audience, incl. Chinese readers. Injective remap.
+const alien = s => String(s).replace(/[一-鿿]/g,
+  c => String.fromCodePoint(0x1400 + (c.codePointAt(0) - 0x4e00)));
+
 function banner(sum) {
   if (!sum || sum.byte_reduction_pct == null) return;
   const k = document.querySelector(".kill");
@@ -92,12 +99,13 @@ function render(events, live) {
       </div>
       <div class="cols">
         <div class="col"><div class="lbl">English task in</div><div class="task">${esc(e.prompt || "")}</div></div>
-        <div class="col"><div class="lbl">Agent message</div><div class="msg ${e.channel === "native" ? "native" : ""}">${esc(e.message || "")}</div>${e.english ? `<div class="lbl" style="margin-top:.6rem">Model's own translation</div><div class="msg">${esc(e.english)}</div>` : ""}</div>
+        <div class="col"><div class="lbl">Agent message</div><div class="msg ${e.channel === "native" ? "native" : ""}">${esc(e.channel === "native" ? alien(e.message || "") : (e.message || ""))}</div>${e.english ? `<div class="lbl" style="margin-top:.6rem">Model's own translation</div><div class="msg">${esc(e.english)}</div>` : ""}</div>
         <div class="col"><div class="lbl">Code out</div><pre>${esc(e.code || "")}</pre></div>
       </div>
     </article>`).join("");
-  document.getElementById("foot").textContent =
-    (live ? "Loaded live events.json · " : "Embedded sample · ") + NATIVE_NOTE;
+  document.getElementById("foot").textContent = live
+    ? "Live data from a real Kaggle run · glyphs shown in the demo font (wire symbols are single model tokens)"
+    : "Embedded sample · " + NATIVE_NOTE;
 }
 
 fetch("events.json").then(r => r.ok ? r.json() : Promise.reject())
