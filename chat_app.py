@@ -14,7 +14,8 @@ example phrasings; glyph input is the most reliable.
 """
 from glyph.agents import _extract_code, builder_prompt, speaker_prompt
 from glyph.channel import Native
-from glyph.paraphrase import HELDOUT_VARIANT, english
+from glyph.paraphrase import HELDOUT_VARIANT, V, english
+from glyph.seed import PRIM_ORDER
 from glyph.policy import LoraPolicy
 from glyph.tasks import load_tasks
 from glyph.verifier import run_tests
@@ -23,6 +24,19 @@ MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct"
 CH = Native()
 DEMO_INPUT = [3, -1, 2, 2, -5]
 P = None
+
+
+_OPS = "\n".join(f"- {V[p][0]}" for p in PRIM_ORDER)
+
+
+def _normalize(msg):
+    """Free English → canonical task phrasing, via the base model's comprehension
+    (the Speaker is only reliable on canonical-style phrasing)."""
+    q = ("Rewrite the request as a pipeline of these list operations, in the exact "
+         "form 'Take a list of integers; OP, then OP.' — use ONLY these operations:\n"
+         + _OPS + f"\n\nRequest: {msg}\nRewrite:")
+    out = P.ask_base(q)
+    return out if "list of integers" in out else f"Take a list of integers; {msg}."
 
 
 def _respond(msg, _history):
@@ -35,7 +49,7 @@ def _respond(msg, _history):
         if all(CH.is_symbol(c) for c in msg):            # user typed glyphs
             glyphs, translation = msg, P.translate(msg)
         else:                                            # user typed English
-            task = {"prompt": f"Take a list of integers; {msg.rstrip('.')}."}
+            task = {"prompt": _normalize(msg)}            # base model normalizes arbitrary phrasing
             glyphs = P.sample(speaker_prompt(task, CH), 1, greedy=True)[0]
             translation = None
         if not glyphs:

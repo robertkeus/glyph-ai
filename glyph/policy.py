@@ -102,6 +102,21 @@ class LoraPolicy:
         return self.tok.decode(out[0][enc.input_ids.shape[1]:].cpu(),
                                skip_special_tokens=True)
 
+    @torch.no_grad()
+    def ask_base(self, prompt, max_new=48):
+        """Plain-text generation from the BARE base model (adapters off) — used to
+        normalize free English before the Speaker encodes it."""
+        self.model.set_adapter("builder")
+        self.model.eval()
+        text = self.tok.apply_chat_template(
+            [{"role": "user", "content": prompt}], tokenize=False, add_generation_prompt=True)
+        enc = self.tok(text, return_tensors="pt").to(self.device)
+        with self.model.disable_adapter():
+            out = self.model.generate(**enc, max_new_tokens=max_new, do_sample=False,
+                                      pad_token_id=self.eos)
+        return self.tok.decode(out[0][enc.input_ids.shape[1]:].cpu(),
+                               skip_special_tokens=True).strip()
+
     def learn(self, prompt, messages, advantages):
         """One GRPO update on the speaker: loss = −Σ advantage·logπ(message)."""
         self.model.set_adapter("speaker")
