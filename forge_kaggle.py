@@ -28,7 +28,7 @@ from glyph.seed import PRIM_ORDER, canonical_message, prim_symbol
 from glyph.tasks import load_tasks
 
 MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct"  # 3B: capacity for the compositional rule + metalinguistic (test 3)
-CKPT = "glyph_ckpt"
+CKPT = "/tmp/glyph_ckpt"  # /tmp → kept out of the kernel output (keeps log downloads fast)
 FAST = bool(os.environ.get("FAST"))
 SEEDED = os.environ.get("FROMSCRATCH") is None
 
@@ -106,11 +106,16 @@ def main():
         f"{prim_symbol(p)} : {operation(_extract_code(policy.build(builder_prompt(ch.builder_text(prim_symbol(p))))))}"
         for p in PRIM_ORDER)
 
+    ex = next(t for t in train if len(t["primitives"]) == 2)  # one-shot format example
+    example = (f"Example — Symbols: {canonical_message(ex)}\n"
+               f"```python\n{solve_solution(ex)}\n```")
+
     def cold_prompt(msg):
         return ("Each symbol maps to one Python statement on a list `r`:\n\n" + expl +
-                "\n\nDefine solve(xs): begin with `r = list(xs)`, then apply the "
-                "statements for these symbols IN ORDER (a statement starting with "
-                "`return` gives the final result; otherwise end with `return r`). "
+                "\n\n" + example +
+                "\n\nNow do the same: define `solve(xs)` starting with `r = list(xs)`, "
+                "apply the statements for the symbols below IN ORDER (a statement "
+                "starting with `return` is the final result; else end with `return r`). "
                 f"Output one ```python block.\nSymbols: {msg}")
 
     print("=== EXPLANATION (model's own per-symbol meanings) ===")

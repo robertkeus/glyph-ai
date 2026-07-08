@@ -88,7 +88,10 @@ class LoraPolicy:
         learned the language (the test-3 cold decoder, PLAN headline)."""
         self.model.set_adapter("builder")
         self.model.eval()
-        enc = self.tok(prompt, return_tensors="pt").to(self.device)
+        text = prompt if not cold else self.tok.apply_chat_template(
+            [{"role": "user", "content": prompt}], tokenize=False,
+            add_generation_prompt=True)  # cold base needs the chat template to follow instructions
+        enc = self.tok(text, return_tensors="pt").to(self.device)
         ctx = self.model.disable_adapter() if cold else nullcontext()
         with ctx:
             out = self.model.generate(**enc, max_new_tokens=self.max_code,
