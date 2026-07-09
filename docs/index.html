@@ -1,50 +1,41 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Glyph — a language AIs use to talk to each other</title>
+<title>Glyph — chat</title>
 <style>
 :root{--bg:#0b0d12;--panel:#141821;--edge:#232a37;--ink:#e6e9ef;--dim:#8b94a7;
---accent:#7cdfff;--glyph:#ffd166;--pass:#4ade80;--mono:ui-monospace,Menlo,Consolas,monospace;
---sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5}
-.wrap{max-width:920px;margin:0 auto;padding:2rem 1.25rem 4rem}
-h1{font-size:clamp(1.5rem,3vw,2.1rem);margin:.2rem 0;letter-spacing:-.02em}
-.sub{color:var(--dim);max-width:60ch}
-.card{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:1.1rem;margin:1.1rem 0}
-input{width:100%;background:#0d1017;border:1px solid var(--edge);color:var(--ink);
-border-radius:8px;padding:.7rem .9rem;font-size:1rem;font-family:var(--sans)}
-.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.7rem 0 0}
-.chip{background:#182030;border:1px solid var(--edge);color:var(--dim);border-radius:99px;
-padding:.25rem .7rem;font-size:.82rem;cursor:pointer}.chip:hover{color:var(--ink);border-color:var(--accent)}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
-@media(max-width:640px){.row{grid-template-columns:1fr}}
-.lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.4rem}
-.glyph{font-size:2.2rem;color:var(--glyph);letter-spacing:.15em;min-height:2.6rem;word-break:break-all}
-pre{margin:0;font-family:var(--mono);font-size:.85rem;white-space:pre-wrap;color:var(--ink)}
-.run{font-family:var(--mono);color:var(--pass);margin-top:.5rem}
-.bytes{font-family:var(--mono);font-size:.9rem;color:var(--accent);margin-top:.6rem}
-.big{font-size:1.5rem;font-weight:700;color:var(--pass)}
-.err{color:#f87171}.foot{color:var(--dim);font-size:.82rem;margin-top:1.5rem}
+--accent:#7cdfff;--glyph:#ffd166;--pass:#4ade80;--user:#1f6feb;
+--mono:ui-monospace,Menlo,Consolas,monospace;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);display:flex;flex-direction:column}
+header{padding:.9rem 1rem;border-bottom:1px solid var(--edge)}
+header b{font-size:1.05rem}header span{color:var(--dim);font-size:.85rem}
+#log{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.8rem;max-width:820px;width:100%;margin:0 auto}
+.msg{max-width:85%;padding:.6rem .85rem;border-radius:14px;font-size:.95rem}
+.u{align-self:flex-end;background:var(--user);color:#fff;border-bottom-right-radius:4px}
+.a{align-self:flex-start;background:var(--panel);border:1px solid var(--edge);border-bottom-left-radius:4px;width:85%}
+.glyph{font-size:2rem;color:var(--glyph);letter-spacing:.15em;word-break:break-all;margin:.1rem 0 .5rem}
+.lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:.5rem 0 .2rem}
+pre{margin:0;font-family:var(--mono);font-size:.82rem;white-space:pre-wrap;color:var(--ink)}
+.run{font-family:var(--mono);color:var(--pass);margin-top:.4rem;font-size:.85rem}
+.bytes{font-family:var(--mono);color:var(--accent);font-size:.85rem;margin-top:.5rem}
+.err{color:#f87171}
+.bar{border-top:1px solid var(--edge);padding:.7rem 1rem;max-width:820px;width:100%;margin:0 auto}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.55rem}
+.chip{background:#182030;border:1px solid var(--edge);color:var(--dim);border-radius:99px;padding:.2rem .65rem;font-size:.8rem;cursor:pointer}
+.chip:hover{color:var(--ink);border-color:var(--accent)}
+.inrow{display:flex;gap:.5rem}
+input{flex:1;background:#0d1017;border:1px solid var(--edge);color:var(--ink);border-radius:10px;padding:.65rem .85rem;font-size:1rem;font-family:var(--sans)}
+button{background:var(--accent);color:#04222c;border:0;border-radius:10px;padding:0 1.1rem;font-weight:700;cursor:pointer}
 a{color:var(--accent)}
-</style></head><body><div class="wrap">
-<h1>Glyph</h1>
-<p class="sub">Two AIs can talk to each other in a tiny picture-language instead of English —
-carrying the same instruction in ~99% fewer characters — and still produce real, working code.
-Type a request below (about a list of numbers) and watch it happen.</p>
-
-<div class="card">
-  <input id="q" placeholder="e.g. keep positives, square them, then sum" autofocus>
+</style></head><body>
+<header><b>Glyph</b> &nbsp;<span>ask about a list of numbers — the agents reply in their own glyph language, then working code</span></header>
+<div id="log"></div>
+<div class="bar">
   <div class="chips" id="chips"></div>
+  <div class="inrow"><input id="q" placeholder="e.g. keep positives, square them, then sum" autofocus>
+  <button id="send">Send</button></div>
 </div>
-
-<div id="out"></div>
-
-<p class="foot">This page runs entirely in your browser — no server, no AI call — so it shows the
-<i>language</i> (message → code → result → savings) reliably. The part where an <b>AI</b> reads
-free English and picks the operations is the model demo (see the repo). Vocabulary: 16 list
-operations. Repo: <a href="https://github.com/robertkeus/glyph-ai">github.com/robertkeus/glyph-ai</a></p>
-</div>
-
 <script>
 const OPS=[
  {k:"evens",g:0x4e00,py:"r = [x for x in r if x % 2 == 0]",fn:r=>r.filter(x=>x%2===0),kw:["even"]},
@@ -66,48 +57,33 @@ const OPS=[
 ];
 const SAMPLE=[3,-1,2,2,-5];
 const EX=["keep positives, square them, then sum","sort big to small and give the top one",
- "remove duplicates then add everything up","keep evens then double them",
- "flip the sign then reverse","square each then count them"];
-
-function parse(text){
- const t=text.toLowerCase();
- const hits=[];
- for(const op of OPS){for(const w of op.kw){const i=t.indexOf(w);if(i>=0){hits.push([i,op]);break;}}}
- hits.sort((a,b)=>a[0]-b[0]);
- const seen=new Set(),ops=[];
- for(const[,op]of hits){if(!seen.has(op.k)){seen.add(op.k);ops.push(op);}}
- return ops;
-}
-function toCode(ops){
- const L=["def solve(xs):","    r = list(xs)"];
- for(const op of ops){L.push("    "+op.py);if(op.red)return L.join("\n");}
- return L.concat(["    return r"]).join("\n");
-}
-function runJs(ops){let r=SAMPLE.slice();for(const op of ops){r=op.fn(r);if(op.red)return r;}return r;}
+ "remove duplicates then add everything up","keep evens then double them","flip the sign then reverse"];
+const alien=cp=>String.fromCodePoint(0x1400+(cp-0x4e00));
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-function fmt(v){return Array.isArray(v)?"["+v.join(", ")+"]":String(v);}
-
-function render(text){
- const out=document.getElementById("out");
- if(!text.trim()){out.innerHTML="";return;}
+const fmt=v=>Array.isArray(v)?"["+v.join(", ")+"]":String(v);
+function parse(text){const t=text.toLowerCase(),hits=[];
+ for(const op of OPS){for(const w of op.kw){const i=t.indexOf(w);if(i>=0){hits.push([i,op]);break;}}}
+ hits.sort((a,b)=>a[0]-b[0]);const seen=new Set(),ops=[];
+ for(const[,op]of hits)if(!seen.has(op.k)){seen.add(op.k);ops.push(op);}return ops;}
+function toCode(ops){const L=["def solve(xs):","    r = list(xs)"];
+ for(const op of ops){L.push("    "+op.py);if(op.red)return L.join("\n");}return L.concat(["    return r"]).join("\n");}
+function runJs(ops){let r=SAMPLE.slice();for(const op of ops){r=op.fn(r);if(op.red)return r;}return r;}
+const log=document.getElementById("log");
+function bubble(cls,html){const d=document.createElement("div");d.className="msg "+cls;d.innerHTML=html;
+ log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+function reply(text){
  const ops=parse(text);
- if(!ops.length){out.innerHTML='<div class="card err">Couldn\'t spot any of the 16 operations — try wording like the examples.</div>';return;}
- const alien=cp=>String.fromCodePoint(0x1400+(cp-0x4e00));  // display-only: reads alien, not CJK
- const glyphs=ops.map(o=>alien(o.g)).join("");
- const gb=ops.length*2, eb=new Blob([text]).size;
- const cut=Math.round((1-gb/eb)*100);
- out.innerHTML=`<div class="card">
-  <div class="row">
-   <div><div class="lbl">Agent-to-agent message (glyphs)</div><div class="glyph">${glyphs}</div>
-    <div class="bytes">${gb} bytes vs ${eb} bytes of English — <span class="big">${cut}% smaller</span></div></div>
-   <div><div class="lbl">Working code it produces</div><pre>${esc(toCode(ops))}</pre>
-    <div class="run">solve(${fmt(SAMPLE)}) → ${esc(fmt(runJs(ops)))}</div></div>
-  </div></div>`;
+ if(!ops.length){bubble("a","<span class='err'>I didn't spot any of my 16 operations — try wording like the suggestions.</span>");return;}
+ const glyphs=ops.map(o=>alien(o.g)).join(""),gb=ops.length*2,eb=new Blob([text]).size,cut=Math.round((1-gb/eb)*100);
+ bubble("a",`<div class="lbl">glyph message</div><div class="glyph">${glyphs}</div>
+  <div class="lbl">working code</div><pre>${esc(toCode(ops))}</pre>
+  <div class="run">solve(${fmt(SAMPLE)}) &rarr; ${esc(fmt(runJs(ops)))}</div>
+  <div class="bytes">${gb} bytes vs ${eb} — ${cut}% smaller</div>`);
 }
-const q=document.getElementById("q");
-q.addEventListener("input",()=>render(q.value));
+function send(text){text=(text||"").trim();if(!text)return;bubble("u",esc(text));document.getElementById("q").value="";reply(text);}
+document.getElementById("send").onclick=()=>send(document.getElementById("q").value);
+document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")send(e.target.value);});
 const chips=document.getElementById("chips");
-EX.forEach(e=>{const b=document.createElement("span");b.className="chip";b.textContent=e;
- b.onclick=()=>{q.value=e;render(e);};chips.appendChild(b);});
-render(EX[0]);q.value=EX[0];
+EX.forEach(e=>{const b=document.createElement("span");b.className="chip";b.textContent=e;b.onclick=()=>send(e);chips.appendChild(b);});
+bubble("a","Hi — I speak a compact glyph language for list operations. Ask me something, or tap a suggestion. I'll reply in glyphs, then real Python, and show how many fewer characters the glyphs use.");
 </script></body></html>
