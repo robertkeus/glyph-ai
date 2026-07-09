@@ -48,27 +48,45 @@ def _intent(msg):
     return [k for t in re.split(r"[,\s]+", _ask(q, 32)) if (k := t.strip()) in _PSET]
 
 
-def respond(msg, _history):
-    msg = (msg or "").strip()[:200]
+_HINTS = tuple(PRIM_ORDER) + ("list", "number", "even", "odd", "positive", "sort",
+    "double", "square", "sum", "max", "reverse", "duplicate", "negate", "absolute", "count")
+
+
+def _chat(history, msg):
+    conv = []
+    for u, a in history or []:
+        conv += [{"role": "user", "content": u}, {"role": "assistant", "content": a}]
+    conv.append({"role": "user", "content": msg})
+    text = _tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
+    enc = _tok(text, return_tensors="pt").to(_dev)
+    out = _model.generate(**enc, max_new_tokens=220, do_sample=True, temperature=0.7,
+                          pad_token_id=_tok.eos_token_id)
+    return _tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True).strip()
+
+
+def respond(msg, history):
+    msg = (msg or "").strip()
     if not msg:
-        return "Ask for a list-of-integers operation, e.g. *keep positives, square them, then sum*."
+        return "Ask me anything — for list-of-number tasks I answer in glyphs + code."
     try:
-        if all(CH.is_symbol(c) for c in msg):
-            glyphs = msg
-        else:
-            glyphs = "".join(prim_symbol(k) for k in _intent(msg))
-        if not glyphs:
-            return "Couldn't map that to the 16 operations — try phrasing like the examples."
-        code = decode(glyphs)
-        r = run_tests(code, f"print(solve({DEMO}))")
-        ran = r["stdout"] if r["passed"] else "error"
+        glyphed = all(CH.is_symbol(c) for c in msg)
+        if glyphed or any(h in msg.lower() for h in _HINTS):     # list-op → glyph mode
+            glyphs = msg if glyphed else "".join(prim_symbol(k) for k in _intent(msg))
+            if glyphs:
+                code = decode(glyphs)
+                r = run_tests(code, f"print(solve({DEMO}))")
+                ran = r["stdout"] if r["passed"] else "error"
+                return (f"In my language: **{glyphs}**  ·  {CH.bytes(glyphs)} bytes "
+                        f"(vs {len(msg)} in English)\n\n```python\n{code}\n```\n\n"
+                        f"`solve({DEMO})` → `{ran}`")
+        return _chat(history, msg)                                 # else → converse
     except Exception as e:
         return f"Error: {type(e).__name__}: {e}"
-    return (f"**glyph** `{glyphs}`  ·  {CH.bytes(glyphs)} bytes\n\n"
-            f"```python\n{code}\n```\n\n`solve({DEMO})` → `{ran}`")
 
 
 if __name__ == "__main__":
-    ex = [t["prompt"].split("; ", 1)[1].rstrip(".") for t in load_tasks(split="heldout")[:6]]
-    gr.ChatInterface(respond, examples=ex, title="Glyph — ask in English, it answers in "
-                     "its own symbol language, then working code").launch(share=True)
+    ex = ["Hi, what can you do?", "keep positives, square them, then sum",
+          "sort big to small and give the top one", "remove duplicates then add everything up"]
+    gr.ChatInterface(respond, examples=ex, title="Glyph",
+                     description="Chat normally; for list-of-number tasks I reply in my "
+                     "glyph language, then working code.").launch(share=True)
