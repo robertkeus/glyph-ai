@@ -170,7 +170,7 @@ EXAMPLES = ["Hi, what can you do?", "keep positives, square them, then sum",
             "explain your glyph language"]
 
 gr.ChatInterface(
-    respond, type="messages", examples=EXAMPLES, title="Glyph",
+    respond, examples=EXAMPLES, title="Glyph",
     description="A chat model that speaks its own compact glyph language for list-of-number "
                 "tasks — answering in symbols, then real Python. Chat normally too.",
 ).launch()
