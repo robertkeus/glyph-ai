@@ -31,6 +31,13 @@ def speaker_prompt(task, channel: Channel) -> str:
 SOLVE = "solve"  # NEUTRAL builder function name
 
 
+def reader_prompt(message: str, keys: str) -> str:
+    """Decode-as-classification: name the operations a message means (keys), which
+    a model does far more reliably than free-form code generation."""
+    return (f"Each symbol is one list operation. Name them IN ORDER as space-separated "
+            f"keys from: {keys}\n\nSymbols: {message}\nKeys:")
+
+
 def translate_prompt(message: str) -> str:
     return (f"Translate this symbol message into one English instruction.\n"
             f"Symbols: {message}\nEnglish:")
