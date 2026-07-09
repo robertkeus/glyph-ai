@@ -26,6 +26,7 @@ MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct"
 CH = Native()
 DEMO_INPUT = [3, -1, 2, 2, -5]
 P = None
+TRAINED = False  # True once trained adapters are loaded (enables glyph→English translation)
 
 
 _KEYS = "\n".join(f"{p} = {V[p][0]}" for p in PRIM_ORDER)
@@ -50,7 +51,8 @@ def _respond(msg, _history):
         return "Ask for a list-of-integers operation, e.g. *keep the even numbers, then double each*."
     try:
         if all(CH.is_symbol(c) for c in msg):            # user typed glyphs
-            glyphs, translation = msg, P.translate(msg)
+            glyphs = msg
+            translation = P.translate(msg) if TRAINED else None
         else:                                            # user typed English
             prims = _intent(msg)                          # base extracts ordered ops
             glyphs = "".join(prim_symbol(p) for p in prims)
@@ -82,38 +84,45 @@ def _resolve_adapters(root):
 
 
 def launch(adapters="auto", rounds=10, share=True):
-    """adapters=<dir> loads a trained checkpoint (seconds); "auto" uses the attached
-    glyph-adapters dataset if present; None forces a fresh warmup (~15 min)."""
+    """English chat needs only the base model (intent + reference decode) — starts in
+    ~3 min, no adapters. "auto" also loads the glyph-adapters dataset IF attached
+    (adds glyph-input translation + the trained agents); "train" warms up (~15 min)."""
     import glob
-    global P
-    if adapters == "auto":
-        adapters = "/kaggle/input" if glob.glob(
-            "/kaggle/input/**/speaker/adapter_config.json", recursive=True) else None
+    global P, TRAINED
     P = LoraPolicy(MODEL, channel=CH)
-    if adapters:
-        P.load(_resolve_adapters(adapters))
-    else:
+    if adapters == "train":
         P.warmup_seeded(load_tasks(split="train"), rounds=rounds,
                         english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True)
+        TRAINED = True
+    else:
+        if adapters == "auto":
+            hit = glob.glob("/kaggle/input/**/speaker/adapter_config.json", recursive=True)
+            adapters = "/kaggle/input" if hit else None
+        if adapters:
+            P.load(_resolve_adapters(adapters))
+            TRAINED = True
+        else:
+            print("Base-only: English chat works; attach glyph-adapters for glyph-input translation.")
+    build_ui().launch(share=share)
+
+
+def build_ui():
     import gradio as gr
     ex = [t["prompt"].split("; ", 1)[1].rstrip(".") for t in load_tasks(split="heldout")[:6]]
-    css = """
-    .gradio-container {background:#0b0d12 !important; color:#e6e9ef !important;}
-    #hdr h1 {font-size:1.6rem; margin:.2rem 0;}
-    #hdr p {color:#8b94a7; margin:.2rem 0;}
-    footer {display:none !important;}
-    """
+    css = (".gradio-container{background:#0b0d12 !important;color:#e6e9ef !important;}"
+           "#hdr h1{font-size:1.6rem;margin:.2rem 0;} #hdr p{color:#8b94a7;} "
+           "footer{display:none !important;}")
 
     def submit(msg, hist):
         return hist + [(msg, _respond(msg, hist))], ""
 
     with gr.Blocks(css=css, title="Glyph", theme=gr.themes.Base()) as ui:
-        gr.Markdown("# Glyph\nAsk for a list-of-integers operation. Two agents talk in "
-                    "a 4-byte glyph language (~99% fewer bytes than English) and out "
-                    "comes working, executed Python.", elem_id="hdr")
+        gr.Markdown("# Glyph\nAsk for a list-of-integers operation. Agents talk in a "
+                    "4-byte glyph language (~99% fewer bytes than English) and out comes "
+                    "working, executed Python.", elem_id="hdr")
         chat = gr.Chatbot(height=430)
         box = gr.Textbox(placeholder="e.g. keep positives, square them, then sum  —  or type glyphs",
                          show_label=False)
         gr.Examples(ex, box, label="Try one (held-out — never trained as a combo)")
         box.submit(submit, [box, chat], [chat, box])
-    ui.launch(share=share)
+    return ui
