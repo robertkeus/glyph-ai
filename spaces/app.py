@@ -88,25 +88,48 @@ def run(code):
         os.unlink(path)
 
 
-def respond(msg, _history):
-    msg = (msg or "").strip()[:200]
+_HINTS = tuple(w for p in PRIMS for w in [p[0]]) + (
+    "list", "number", "even", "odd", "positive", "sort", "double", "square",
+    "sum", "max", "reverse", "duplicate", "negate", "absolute", "count")
+
+
+def chat(history, msg):
+    """Normal multi-turn conversation via the base model."""
+    conv = []
+    for u, a in history:
+        conv += [{"role": "user", "content": u}, {"role": "assistant", "content": a}]
+    conv.append({"role": "user", "content": msg})
+    text = tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
+    enc = tok(text, return_tensors="pt").to(DEV)
+    out = model.generate(**enc, max_new_tokens=220, do_sample=True, temperature=0.7,
+                         pad_token_id=tok.eos_token_id)
+    return tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True).strip()
+
+
+def respond(msg, history):
+    msg = (msg or "").strip()
     if not msg:
-        return "Ask for a list-of-integers operation, e.g. *keep positives, square them, then sum*."
-    if all(c in BY_GLYPH for c in msg):        # user typed glyphs
-        keys = [BY_GLYPH[c][0] for c in msg]
-    else:
-        keys = intent(msg)
-    if not keys:
-        return "Couldn't map that to the 16 operations — try phrasing like the examples."
-    glyphs = "".join(BY_KEY[k][1] for k in keys)
-    code = to_code(keys)
-    return (f"**glyph** `{glyphs}`  ·  {len(keys) * 2} bytes\n\n"
-            f"```python\n{code}\n```\n\n`solve({DEMO})` → `{run(code)}`")
+        return "Ask me anything — and for list-of-numbers tasks I'll answer in my glyph language + code."
+    # glyph mode only when it looks like a list-operation request
+    is_glyph = all(c in BY_GLYPH for c in msg) or any(h in msg.lower() for h in _HINTS)
+    if is_glyph:
+        keys = [BY_GLYPH[c][0] for c in msg] if all(c in BY_GLYPH for c in msg) else intent(msg)
+        if keys:
+            glyphs = "".join(BY_KEY[k][1] for k in keys)
+            code = to_code(keys)
+            en = ", ".join(BY_KEY[k][3] for k in keys)
+            return (f"In my language that's **{glyphs}** ({len(keys) * 2} bytes — vs "
+                    f"{len(msg)} in English). It means: *{en}*.\n\n```python\n{code}\n```\n\n"
+                    f"Running it: `solve({DEMO})` → `{run(code)}`")
+    return chat(history or [], msg)          # otherwise, just converse
 
 
-EXAMPLES = ["keep positives, square them, then sum", "sort big to small and give the top one",
-            "remove duplicates then add everything up", "keep evens then double them",
-            "flip signs then reverse", "square each then count them"]
+EXAMPLES = ["Hi, what can you do?", "keep positives, square them, then sum",
+            "sort big to small and give the top one", "remove duplicates then add everything up",
+            "explain your glyph language"]
 
-gr.ChatInterface(respond, examples=EXAMPLES,
-                 title="Glyph — a model that answers in its own symbol language").launch()
+gr.ChatInterface(
+    respond, examples=EXAMPLES, title="Glyph",
+    description="A chat model that speaks its own compact glyph language for list-of-number "
+                "tasks — answering in symbols, then real Python. Chat normally too.",
+).launch()
