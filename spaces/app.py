@@ -157,7 +157,7 @@ def _respond(msg, history):
     if all(c in BY_GLYPH for c in msg):
         keys = [BY_GLYPH[c][0] for c in msg]
     else:
-        keys = kw_parse(msg) or intent(msg)
+        keys = kw_parse(msg)          # reliable; no model guessing (avoids false glyph mode on chat)
 
     if keys:  # stream the glyph reasoning step by step
         al = lambda g: chr(0x1400 + (ord(g) - 0x4e00))
