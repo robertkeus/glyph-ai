@@ -88,9 +88,35 @@ def run(code):
         os.unlink(path)
 
 
-_HINTS = tuple(w for p in PRIMS for w in [p[0]]) + (
-    "list", "number", "even", "odd", "positive", "sort", "double", "square",
-    "sum", "max", "reverse", "duplicate", "negate", "absolute", "count")
+KW = {  # reliable keyword parse (fast, instant) — order in the sentence = op order
+    "evens": ["even"], "pos": ["positive"], "double": ["double", "twice"],
+    "square": ["square"], "inc": ["add one", "increment", "plus one"],
+    "negate": ["negate", "flip sign", "flip the sign", "invert"],
+    "absval": ["absolute", "abs value"], "rev": ["revers", "backward", "back to front"],
+    "sorta": ["ascending", "smallest to", "low to high", "increasing"],
+    "sortd": ["descending", "big to small", "large to small", "high to low", "biggest to"],
+    "uniq": ["dedup", "duplicate", "unique", "distinct"],
+    "dec": ["subtract one", "decrement", "minus one"],
+    "sum": ["sum", "add up", "total", "add everything", "add them"],
+    "max": ["max", "biggest", "largest", "top one", "the top", "highest"],
+    "len": ["how many", "length", "size"], "cnt": ["count", "number of"],
+}
+
+
+def kw_parse(msg):
+    low = msg.lower()
+    hits = []
+    for k, words in KW.items():
+        for w in words:
+            i = low.find(w)
+            if i >= 0:
+                hits.append((i, k)); break
+    hits.sort()
+    seen, keys = set(), []
+    for _, k in hits:
+        if k not in seen:
+            seen.add(k); keys.append(k)
+    return keys
 
 
 def chat(history, msg):
@@ -118,22 +144,24 @@ def respond(msg, history):
     msg = (msg or "").strip()
     if not msg:
         return "Ask me anything — and for list-of-numbers tasks I'll answer in my glyph language + code."
-    # glyph mode only when it looks like a list-operation request
-    is_glyph = all(c in BY_GLYPH for c in msg) or any(h in msg.lower() for h in _HINTS)
-    if is_glyph:
-        keys = [BY_GLYPH[c][0] for c in msg] if all(c in BY_GLYPH for c in msg) else intent(msg)
-        if keys:
-            al = lambda g: chr(0x1400 + (ord(g) - 0x4e00))          # alien display glyph
-            glyphs = "".join(al(BY_KEY[k][1]) for k in keys)
-            code = to_code(keys)
-            steps = "\n".join(f"{i+1}. *{BY_KEY[k][3]}*  →  {al(BY_KEY[k][1])}  →  `{BY_KEY[k][2]}`"
-                              for i, k in enumerate(keys))
-            return (f"**🧠 Reasoning — I break the request into operations, encode each as one "
-                    f"glyph, and compose the code:**\n{steps}\n\n"
-                    f"**Message the agents actually send:** {glyphs} — "
-                    f"**{len(keys) * 2} bytes** vs {len(msg)} in English "
-                    f"({round((1 - len(keys)*2/max(len(msg),1))*100)}% smaller)\n\n"
-                    f"```python\n{code}\n```\n\nRunning it: `solve({DEMO})` → `{run(code)}`")
+    # glyph mode when the message maps to operations (fast keyword parse; then the
+    # model's own intent-extraction as a fallback for looser phrasings)
+    if all(c in BY_GLYPH for c in msg):
+        keys = [BY_GLYPH[c][0] for c in msg]
+    else:
+        keys = kw_parse(msg) or intent(msg)
+    if keys:
+        al = lambda g: chr(0x1400 + (ord(g) - 0x4e00))              # alien display glyph
+        glyphs = "".join(al(BY_KEY[k][1]) for k in keys)
+        code = to_code(keys)
+        steps = "\n".join(f"{i+1}. *{BY_KEY[k][3]}*  →  {al(BY_KEY[k][1])}  →  `{BY_KEY[k][2]}`"
+                          for i, k in enumerate(keys))
+        return (f"**🧠 Reasoning — I break the request into operations, encode each as one "
+                f"glyph, and compose the code:**\n{steps}\n\n"
+                f"**Message the agents actually send:** {glyphs} — "
+                f"**{len(keys) * 2} bytes** vs {len(msg)} in English "
+                f"({round((1 - len(keys)*2/max(len(msg),1))*100)}% smaller)\n\n"
+                f"```python\n{code}\n```\n\nRunning it: `solve({DEMO})` → `{run(code)}`")
     return chat(history or [], msg)          # otherwise, just converse
 
 
