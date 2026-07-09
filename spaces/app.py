@@ -101,7 +101,7 @@ def chat(history, msg):
     conv.append({"role": "user", "content": msg})
     text = tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
     enc = tok(text, return_tensors="pt").to(DEV)
-    out = model.generate(**enc, max_new_tokens=220, do_sample=True, temperature=0.7,
+    out = model.generate(**enc, max_new_tokens=160, do_sample=True, temperature=0.7,
                          pad_token_id=tok.eos_token_id)
     return tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True).strip()
 
