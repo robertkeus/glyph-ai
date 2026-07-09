@@ -43,7 +43,7 @@ KEYSET = {p[0] for p in PRIMS}
 MENU = "\n".join(f"{p[0]} = {p[3]}" for p in PRIMS)
 DEMO = [3, -1, 2, 2, -5]
 
-MODEL = os.environ.get("GLYPH_MODEL", "Qwen/Qwen2.5-Coder-1.5B-Instruct")
+MODEL = os.environ.get("GLYPH_MODEL", "Qwen/Qwen2.5-Coder-0.5B-Instruct")  # light → stable on free CPU
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 tok = AutoTokenizer.from_pretrained(MODEL)
 model = AutoModelForCausalLM.from_pretrained(
@@ -120,13 +120,10 @@ def kw_parse(msg):
     return keys
 
 
-def _chat_stream(history, msg):
-    """Stream the base model's tokens for normal conversation."""
-    from threading import Thread
-
-    from transformers import TextIteratorStreamer
+def _chat(history, msg):
+    """Plain (non-threaded) generation for normal conversation — robust on free CPU."""
     conv = []
-    for h in history or []:
+    for h in (history or [])[-6:]:                       # cap context → cap memory
         if isinstance(h, dict) and h.get("content"):
             conv.append({"role": h.get("role", "user"), "content": h["content"]})
         elif isinstance(h, (list, tuple)) and len(h) == 2:
@@ -138,14 +135,10 @@ def _chat_stream(history, msg):
     conv.append({"role": "user", "content": msg})
     text = tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
     enc = tok(text, return_tensors="pt").to(DEV)
-    streamer = TextIteratorStreamer(tok, skip_prompt=True, skip_special_tokens=True)
-    Thread(target=model.generate, kwargs=dict(
-        **enc, max_new_tokens=160, do_sample=True, temperature=0.7,
-        pad_token_id=tok.eos_token_id, streamer=streamer)).start()
-    acc = ""
-    for piece in streamer:
-        acc += piece
-        yield acc
+    with torch.no_grad():
+        out = model.generate(**enc, max_new_tokens=120, do_sample=True, temperature=0.7,
+                             pad_token_id=tok.eos_token_id)
+    return tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True).strip()
 
 
 def respond(msg, history):
@@ -192,7 +185,7 @@ def _respond(msg, history):
         yield buf
         return
 
-    yield from _chat_stream(history or [], msg)     # normal chat — streamed tokens
+    yield _chat(history or [], msg)                  # normal chat (non-threaded, robust)
 
 
 EXAMPLES = ["Hi, what can you do?", "keep positives, square them, then sum",
