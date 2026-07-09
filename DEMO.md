@@ -29,8 +29,8 @@ Type a request → glyph message + working Python + run result.
 - **Lead with the click-to-run example prompts** (held-out tasks) — reliable, and
   they're the impressive "never trained on this combo" cases.
 - **Or type glyphs directly** (e.g. `与专`) — the most reliable input path.
-- Free-typed English works ~65% (a base-model front-end normalizes it). When it
-  misses, the glyph message still renders — a good talking point: *the language is
+- Free-typed English works ~95% (a base-model intent-extractor maps it to
+  operations, then glyphs are built deterministically). When it misses, the glyph message still renders — a good talking point: *the language is
   exact; the English front-door is the fuzzy part.*
 
 ## Numbers (Qwen2.5-Coder-3B, seed=0, Kaggle T4)
@@ -39,7 +39,7 @@ Type a request → glyph message + working Python + run result.
 | Byte reduction, native vs English A2A | **98.8%** (3 B vs 293 B / solved task) |
 | Compositional generalization (held-out) | 12/22 |
 | Cold-model self-explanation decode | 13/22 |
-| Free-English input | ~65% |
+| Free-English input (intent-extraction) | 21/22 (95%) |
 
 ## Honest caveats (say them — they make it credible)
 - **Seeded, not from-scratch:** primitives are grounded to symbols, then learned/used.
