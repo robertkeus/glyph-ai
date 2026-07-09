@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 import gradio as gr
 import torch
@@ -119,9 +120,11 @@ def kw_parse(msg):
     return keys
 
 
-def chat(history, msg):
-    """Normal multi-turn conversation via the base model. Accepts Gradio history in
-    either format: message-dicts ({role,content}) or (user, assistant) tuples."""
+def _chat_stream(history, msg):
+    """Stream the base model's tokens for normal conversation."""
+    from threading import Thread
+
+    from transformers import TextIteratorStreamer
     conv = []
     for h in history or []:
         if isinstance(h, dict) and h.get("content"):
@@ -135,34 +138,54 @@ def chat(history, msg):
     conv.append({"role": "user", "content": msg})
     text = tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
     enc = tok(text, return_tensors="pt").to(DEV)
-    out = model.generate(**enc, max_new_tokens=160, do_sample=True, temperature=0.7,
-                         pad_token_id=tok.eos_token_id)
-    return tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True).strip()
+    streamer = TextIteratorStreamer(tok, skip_prompt=True, skip_special_tokens=True)
+    Thread(target=model.generate, kwargs=dict(
+        **enc, max_new_tokens=160, do_sample=True, temperature=0.7,
+        pad_token_id=tok.eos_token_id, streamer=streamer)).start()
+    acc = ""
+    for piece in streamer:
+        acc += piece
+        yield acc
 
 
 def respond(msg, history):
+    """Generator → streams a visible chain of thought (Gradio renders each yield)."""
     msg = (msg or "").strip()
     if not msg:
-        return "Ask me anything — and for list-of-numbers tasks I'll answer in my glyph language + code."
-    # glyph mode when the message maps to operations (fast keyword parse; then the
-    # model's own intent-extraction as a fallback for looser phrasings)
+        yield "Ask me anything — for list-of-number tasks I show my reasoning in glyphs + code."
+        return
     if all(c in BY_GLYPH for c in msg):
         keys = [BY_GLYPH[c][0] for c in msg]
     else:
         keys = kw_parse(msg) or intent(msg)
-    if keys:
-        al = lambda g: chr(0x1400 + (ord(g) - 0x4e00))              # alien display glyph
+
+    if keys:  # stream the glyph reasoning step by step
+        al = lambda g: chr(0x1400 + (ord(g) - 0x4e00))
+        buf = "🧠 *reading your request…*"
+        yield buf
+        time.sleep(0.5)
+        buf = "🧠 **Reasoning — turning your words into my glyph language:**\n\n"
+        yield buf
+        for i, k in enumerate(keys):
+            time.sleep(0.6)
+            buf += f"{i+1}. *{BY_KEY[k][3]}*  →  **{al(BY_KEY[k][1])}**  →  `{BY_KEY[k][2]}`\n"
+            yield buf
         glyphs = "".join(al(BY_KEY[k][1]) for k in keys)
+        cut = round((1 - len(keys) * 2 / max(len(msg), 1)) * 100)
+        time.sleep(0.5)
+        buf += (f"\n📨 **Message the agents send:** {glyphs}  ·  **{len(keys)*2} bytes** "
+                f"vs {len(msg)} in English (**{cut}% smaller**)\n")
+        yield buf
         code = to_code(keys)
-        steps = "\n".join(f"{i+1}. *{BY_KEY[k][3]}*  →  {al(BY_KEY[k][1])}  →  `{BY_KEY[k][2]}`"
-                          for i, k in enumerate(keys))
-        return (f"**🧠 Reasoning — I break the request into operations, encode each as one "
-                f"glyph, and compose the code:**\n{steps}\n\n"
-                f"**Message the agents actually send:** {glyphs} — "
-                f"**{len(keys) * 2} bytes** vs {len(msg)} in English "
-                f"({round((1 - len(keys)*2/max(len(msg),1))*100)}% smaller)\n\n"
-                f"```python\n{code}\n```\n\nRunning it: `solve({DEMO})` → `{run(code)}`")
-    return chat(history or [], msg)          # otherwise, just converse
+        time.sleep(0.4)
+        buf += f"\n🛠️ **Composing the code…**\n```python\n{code}\n```\n"
+        yield buf
+        time.sleep(0.5)
+        buf += f"\n▶️ **Running it:** `solve({DEMO})` → **`{run(code)}`**"
+        yield buf
+        return
+
+    yield from _chat_stream(history or [], msg)     # normal chat — streamed tokens
 
 
 EXAMPLES = ["Hi, what can you do?", "keep positives, square them, then sum",
