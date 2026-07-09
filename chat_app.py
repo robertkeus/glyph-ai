@@ -96,10 +96,24 @@ def launch(adapters="auto", rounds=10, share=True):
         P.warmup_seeded(load_tasks(split="train"), rounds=rounds,
                         english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True)
     import gradio as gr
-    ex = [t["prompt"].split("; ", 1)[1] for t in load_tasks(split="heldout")[:6]]
-    gr.ChatInterface(
-        _respond, title="Glyph — talk to a model that answers in its own language",
-        description="Ask for a list-of-integers operation. It replies in glyphs, "
-                    "then working Python. (16-symbol vocabulary; phrase like the examples.)",
-        examples=ex,
-    ).launch(share=share)
+    ex = [t["prompt"].split("; ", 1)[1].rstrip(".") for t in load_tasks(split="heldout")[:6]]
+    css = """
+    .gradio-container {background:#0b0d12 !important; color:#e6e9ef !important;}
+    #hdr h1 {font-size:1.6rem; margin:.2rem 0;}
+    #hdr p {color:#8b94a7; margin:.2rem 0;}
+    footer {display:none !important;}
+    """
+
+    def submit(msg, hist):
+        return hist + [(msg, _respond(msg, hist))], ""
+
+    with gr.Blocks(css=css, title="Glyph", theme=gr.themes.Base()) as ui:
+        gr.Markdown("# Glyph\nAsk for a list-of-integers operation. Two agents talk in "
+                    "a 4-byte glyph language (~99% fewer bytes than English) and out "
+                    "comes working, executed Python.", elem_id="hdr")
+        chat = gr.Chatbot(height=430)
+        box = gr.Textbox(placeholder="e.g. keep positives, square them, then sum  —  or type glyphs",
+                         show_label=False)
+        gr.Examples(ex, box, label="Try one (held-out — never trained as a combo)")
+        box.submit(submit, [box, chat], [chat, box])
+    ui.launch(share=share)
