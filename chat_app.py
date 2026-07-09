@@ -14,8 +14,10 @@ example phrasings; glyph input is the most reliable.
 """
 from glyph.agents import _extract_code, builder_prompt, speaker_prompt
 from glyph.channel import Native
+import re
+
 from glyph.paraphrase import HELDOUT_VARIANT, V, english
-from glyph.seed import PRIM_ORDER
+from glyph.seed import PRIM_ORDER, prim_symbol
 from glyph.policy import LoraPolicy
 from glyph.tasks import load_tasks
 from glyph.verifier import run_tests
@@ -27,6 +29,18 @@ P = None
 
 
 _OPS = "\n".join(f"- {V[p][0]}" for p in PRIM_ORDER)
+_KEYS = "\n".join(f"{p} = {V[p][0]}" for p in PRIM_ORDER)
+_PSET = set(PRIM_ORDER)
+
+
+def _intent(msg):
+    """Free English → ordered primitive keys, via the base model's comprehension.
+    The glyph message is then built DETERMINISTICALLY (no brittle Speaker step)."""
+    q = ("List the operations the request performs, IN ORDER, as comma-separated "
+         "keys from this menu (keys only, e.g. `evens, double`):\n" + _KEYS +
+         f"\n\nRequest: {msg}\nKeys:")
+    out = P.ask_base(q, max_new=32)
+    return [k for tok in re.split(r"[,\s]+", out) if (k := tok.strip()) in _PSET]
 
 
 def _normalize(msg):
@@ -49,8 +63,11 @@ def _respond(msg, _history):
         if all(CH.is_symbol(c) for c in msg):            # user typed glyphs
             glyphs, translation = msg, P.translate(msg)
         else:                                            # user typed English
-            task = {"prompt": _normalize(msg)}            # base model normalizes arbitrary phrasing
-            glyphs = P.sample(speaker_prompt(task, CH), 1, greedy=True)[0]
+            prims = _intent(msg)                          # base extracts ordered ops
+            if prims:
+                glyphs = "".join(prim_symbol(p) for p in prims)  # deterministic encode
+            else:                                         # fallback: trained Speaker
+                glyphs = P.sample(speaker_prompt({"prompt": _normalize(msg)}, CH), 1, greedy=True)[0]
             translation = None
         if not glyphs:
             return "The Speaker couldn't encode that — try phrasing it like the examples."
