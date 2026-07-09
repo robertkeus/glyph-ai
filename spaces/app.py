@@ -115,12 +115,17 @@ def respond(msg, history):
     if is_glyph:
         keys = [BY_GLYPH[c][0] for c in msg] if all(c in BY_GLYPH for c in msg) else intent(msg)
         if keys:
-            glyphs = "".join(chr(0x1400 + (ord(BY_KEY[k][1]) - 0x4e00)) for k in keys)  # alien display
+            al = lambda g: chr(0x1400 + (ord(g) - 0x4e00))          # alien display glyph
+            glyphs = "".join(al(BY_KEY[k][1]) for k in keys)
             code = to_code(keys)
-            en = ", ".join(BY_KEY[k][3] for k in keys)
-            return (f"In my language that's **{glyphs}** ({len(keys) * 2} bytes — vs "
-                    f"{len(msg)} in English). It means: *{en}*.\n\n```python\n{code}\n```\n\n"
-                    f"Running it: `solve({DEMO})` → `{run(code)}`")
+            steps = "\n".join(f"{i+1}. *{BY_KEY[k][3]}*  →  {al(BY_KEY[k][1])}  →  `{BY_KEY[k][2]}`"
+                              for i, k in enumerate(keys))
+            return (f"**🧠 Reasoning — I break the request into operations, encode each as one "
+                    f"glyph, and compose the code:**\n{steps}\n\n"
+                    f"**Message the agents actually send:** {glyphs} — "
+                    f"**{len(keys) * 2} bytes** vs {len(msg)} in English "
+                    f"({round((1 - len(keys)*2/max(len(msg),1))*100)}% smaller)\n\n"
+                    f"```python\n{code}\n```\n\nRunning it: `solve({DEMO})` → `{run(code)}`")
     return chat(history or [], msg)          # otherwise, just converse
 
 
