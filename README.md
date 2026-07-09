@@ -1,7 +1,11 @@
 # Glyph
 
-A model that forges its own native logographic agent-language on coding tasks,
-then explains it well enough that a cold model can decode it. See [PLAN.md](PLAN.md).
+A model that speaks a native logographic agent-language on coding tasks — one glyph
+per operation — turns it into working code, and explains it well enough that a cold
+model can decode it. **98.8% fewer bytes** than the same agents in English.
+
+**→ [DEMO.md](DEMO.md)** for how to present it. Design in [PLAN.md](PLAN.md),
+numbers in [RESULTS.md](RESULTS.md).
 
 ## Status: Phase 0 (harness) — complete, GPU-free parts green
 
