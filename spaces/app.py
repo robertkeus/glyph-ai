@@ -115,7 +115,7 @@ def respond(msg, history):
     if is_glyph:
         keys = [BY_GLYPH[c][0] for c in msg] if all(c in BY_GLYPH for c in msg) else intent(msg)
         if keys:
-            glyphs = "".join(BY_KEY[k][1] for k in keys)
+            glyphs = "".join(chr(0x1400 + (ord(BY_KEY[k][1]) - 0x4e00)) for k in keys)  # alien display
             code = to_code(keys)
             en = ", ".join(BY_KEY[k][3] for k in keys)
             return (f"In my language that's **{glyphs}** ({len(keys) * 2} bytes — vs "
