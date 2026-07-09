@@ -150,6 +150,13 @@ def _chat_stream(history, msg):
 
 def respond(msg, history):
     """Generator → streams a visible chain of thought (Gradio renders each yield)."""
+    try:
+        yield from _respond(msg, history)
+    except Exception as e:  # never hard-crash the UI
+        yield f"⚠️ Small hiccup ({type(e).__name__}). Please send it again."
+
+
+def _respond(msg, history):
     msg = (msg or "").strip()
     if not msg:
         yield "Ask me anything — for list-of-number tasks I show my reasoning in glyphs + code."
