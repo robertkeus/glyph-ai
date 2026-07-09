@@ -1,4 +1,4 @@
 transformers>=4.40
 torch
-gradio>=4.44,<5
+gradio
 numpy<2
