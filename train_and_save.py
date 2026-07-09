@@ -18,7 +18,8 @@ CH = Native()
 
 p = LoraPolicy(MODEL, channel=CH)
 p.warmup_seeded(load_tasks(split="train"), rounds=10,
-                english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True)
+                english=lambda t, rd: english(t, rd % HELDOUT_VARIANT), translate=True,
+                builder_extra=8)  # boost glyph→code chain fidelity
 p.save(ADAPTERS)
 print("SAVED adapters ->", ADAPTERS)
 
@@ -36,10 +37,10 @@ rob = sum(q.sample(speaker_prompt(dict(t, prompt=english(t, HELDOUT_VARIANT)), C
                    1, greedy=True)[0] == canonical_message(t) for t in train)
 print(f"METRICS  test2(compositional) {t2}/{len(held)}  speaker_robust(unseen phrasing) {rob}/{len(train)}")
 
-print("=== BOOT TEST (loaded, not warmed) ===")
-for m in ["keep the even numbers, then double each",
-          "sort descending, then return the maximum",
-          "reverse the order, then drop duplicates",
-          "三下"]:
+print("=== BOOT TEST — free-typed English (the demo scenario) ===")
+for m in ["biggest value after sorting big to small",
+          "flip signs then put it backwards",
+          "dedupe then add up everything",
+          "keep positives, square them, then sum"]:
     print(f"\nUSER: {m}\n{chat_app._respond(m, None)}")
 print("\nBOOT OK")

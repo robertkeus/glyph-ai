@@ -169,7 +169,8 @@ class LoraPolicy:
         self.model.eval()
         return loss.item()
 
-    def warmup_seeded(self, tasks, rounds=2, english=None, translate=False):
+    def warmup_seeded(self, tasks, rounds=2, english=None, translate=False,
+                      builder_extra=0):
         """Seed both adapters to the grounded code (PLAN §A fallback): Speaker
         task→canonical symbols, Builder canonical symbols→code. Breaks cold-start.
 
@@ -190,6 +191,14 @@ class LoraPolicy:
                 if translate:
                     self._sft(translate_prompt(cm), " " + t["prompt"] + eos,
                               "translator", self.opt_translator)
+        # extra Builder-only epochs — glyph→code chain fidelity is the bottleneck
+        # (separate adapter, so this doesn't disturb speaker/translator)
+        for _ in range(builder_extra):
+            for t in tasks:
+                cm = canonical_message(t)
+                self._sft(builder_prompt(self.channel.builder_text(cm)),
+                          f"```python\n{solve_solution(t)}\n```{eos}",
+                          "builder", self.opt_builder)
 
     @torch.no_grad()
     def translate(self, message: str) -> str:
