@@ -94,10 +94,18 @@ _HINTS = tuple(w for p in PRIMS for w in [p[0]]) + (
 
 
 def chat(history, msg):
-    """Normal multi-turn conversation via the base model."""
+    """Normal multi-turn conversation via the base model. Accepts Gradio history in
+    either format: message-dicts ({role,content}) or (user, assistant) tuples."""
     conv = []
-    for u, a in history:
-        conv += [{"role": "user", "content": u}, {"role": "assistant", "content": a}]
+    for h in history or []:
+        if isinstance(h, dict) and h.get("content"):
+            conv.append({"role": h.get("role", "user"), "content": h["content"]})
+        elif isinstance(h, (list, tuple)) and len(h) == 2:
+            u, a = h
+            if u:
+                conv.append({"role": "user", "content": u})
+            if a:
+                conv.append({"role": "assistant", "content": a})
     conv.append({"role": "user", "content": msg})
     text = tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
     enc = tok(text, return_tensors="pt").to(DEV)
@@ -134,7 +142,7 @@ EXAMPLES = ["Hi, what can you do?", "keep positives, square them, then sum",
             "explain your glyph language"]
 
 gr.ChatInterface(
-    respond, examples=EXAMPLES, title="Glyph",
+    respond, type="messages", examples=EXAMPLES, title="Glyph",
     description="A chat model that speaks its own compact glyph language for list-of-number "
                 "tasks — answering in symbols, then real Python. Chat normally too.",
 ).launch()
