@@ -15,23 +15,28 @@ Open `demo/index.html` (or `python3 -m http.server --directory demo`). Shows rea
 run data: the **98.8% fewer bytes** banner, held-out tasks paired native-vs-English,
 alien glyphs, the model's own translations, and the cold-decode kill-move.
 
-### B. Live chat (Kaggle GPU, ~2-min start)
-Kaggle notebook → GPU **T4** → Internet on → Add Input → dataset
-`robertkeus/glyph-adapters`:
+### B. Live chat (Kaggle GPU, ~3-min start, no dataset needed)
+Kaggle notebook → GPU **T4** → Internet on:
 ```python
 !git clone https://github.com/robertkeus/glyph-ai && %cd glyph-ai
 !pip -q install peft gradio
-import chat_app; chat_app.launch()      # auto-loads adapters → public URL
+import chat_app; chat_app.launch()      # base model only → public chat URL
 ```
-Type a request → glyph message + working Python + run result.
+Type a request → glyph message + working Python + run result. Optionally attach the
+`robertkeus/glyph-adapters` dataset first — `launch()` auto-detects it and adds
+glyph-input translation + the trained Speaker/Builder agents.
+
+## How the pipeline works (say this)
+free English → **base model extracts the operations** (intent, ~95%) → **4-byte
+glyph message** → the glyph language's **formal semantics compile it to Python**
+(100% valid) → executed. The 4 vs ~290 bytes is the token win; the glyphs are the
+compressed agent-to-agent message.
 
 ## Running it live — do this
-- **Lead with the click-to-run example prompts** (held-out tasks) — reliable, and
-  they're the impressive "never trained on this combo" cases.
-- **Or type glyphs directly** (e.g. `与专`) — the most reliable input path.
-- Free-typed English works ~95% (a base-model intent-extractor maps it to
-  operations, then glyphs are built deterministically). When it misses, the glyph message still renders — a good talking point: *the language is
-  exact; the English front-door is the fuzzy part.*
+- **Type freely** — "keep positives, square them, then sum", "biggest after sorting
+  big to small" — all produce correct, executed code.
+- Or **click an example**, or **type glyphs** (e.g. `与专`) for the raw language.
+- Stay in the list-of-integers world (16 operations) — that's the trained domain.
 
 ## Numbers (Qwen2.5-Coder-3B, seed=0, Kaggle T4)
 | Claim | Result |
