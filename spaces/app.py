@@ -120,19 +120,7 @@ def kw_parse(msg):
     return keys
 
 
-def _chat(history, msg):
-    """Plain (non-threaded) generation for normal conversation — robust on free CPU."""
-    conv = []
-    for h in (history or [])[-6:]:                       # cap context → cap memory
-        if isinstance(h, dict) and h.get("content"):
-            conv.append({"role": h.get("role", "user"), "content": h["content"]})
-        elif isinstance(h, (list, tuple)) and len(h) == 2:
-            u, a = h
-            if u:
-                conv.append({"role": "user", "content": u})
-            if a:
-                conv.append({"role": "assistant", "content": a})
-    conv.append({"role": "user", "content": msg})
+def _gen(conv):
     text = tok.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
     enc = tok(text, return_tensors="pt").to(DEV)
     with torch.no_grad():
@@ -141,12 +129,39 @@ def _chat(history, msg):
     return tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True).strip()
 
 
+def _conv(history, msg):
+    """Coerce any Gradio history shape (dicts / tuples / stray types) to a clean
+    list of {role, content} string pairs."""
+    conv = []
+    for h in (history or [])[-6:]:
+        if isinstance(h, dict):
+            role, content = h.get("role"), h.get("content")
+            if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                conv.append({"role": role, "content": content})
+        elif isinstance(h, (list, tuple)) and len(h) == 2:
+            u, a = h
+            if isinstance(u, str) and u.strip():
+                conv.append({"role": "user", "content": u})
+            if isinstance(a, str) and a.strip():
+                conv.append({"role": "assistant", "content": a})
+    conv.append({"role": "user", "content": msg})
+    return conv
+
+
+def _chat(history, msg):
+    """Plain generation. Falls back to no-history if the history shape is odd."""
+    try:
+        return _gen(_conv(history, msg))
+    except Exception:
+        return _gen([{"role": "user", "content": msg}])
+
+
 def respond(msg, history):
     """Generator → streams a visible chain of thought (Gradio renders each yield)."""
     try:
         yield from _respond(msg, history)
     except Exception as e:  # never hard-crash the UI
-        yield f"⚠️ Small hiccup ({type(e).__name__}). Please send it again."
+        yield f"⚠️ hiccup: {type(e).__name__}: {str(e)[:150]}"
 
 
 def _respond(msg, history):
