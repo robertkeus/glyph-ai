@@ -12,8 +12,8 @@ Open the URL and type a list-of-integers request, e.g.:
 Scope: it only speaks list operations (16 symbols). English works best near the
 example phrasings; glyph input is the most reliable.
 """
-from glyph.agents import _extract_code, builder_prompt, speaker_prompt
 from glyph.channel import Native
+from glyph.decode import decode
 import re
 
 from glyph.paraphrase import HELDOUT_VARIANT, V, english
@@ -28,7 +28,6 @@ DEMO_INPUT = [3, -1, 2, 2, -5]
 P = None
 
 
-_OPS = "\n".join(f"- {V[p][0]}" for p in PRIM_ORDER)
 _KEYS = "\n".join(f"{p} = {V[p][0]}" for p in PRIM_ORDER)
 _PSET = set(PRIM_ORDER)
 
@@ -43,16 +42,6 @@ def _intent(msg):
     return [k for tok in re.split(r"[,\s]+", out) if (k := tok.strip()) in _PSET]
 
 
-def _normalize(msg):
-    """Free English → canonical task phrasing, via the base model's comprehension
-    (the Speaker is only reliable on canonical-style phrasing)."""
-    q = ("Rewrite the request as a pipeline of these list operations, in the exact "
-         "form 'Take a list of integers; OP, then OP.' — use ONLY these operations:\n"
-         + _OPS + f"\n\nRequest: {msg}\nRewrite:")
-    out = P.ask_base(q)
-    return out if "list of integers" in out else f"Take a list of integers; {msg}."
-
-
 def _respond(msg, _history):
     if P is None:
         return "Model still warming up — try again in a moment."
@@ -64,14 +53,11 @@ def _respond(msg, _history):
             glyphs, translation = msg, P.translate(msg)
         else:                                            # user typed English
             prims = _intent(msg)                          # base extracts ordered ops
-            if prims:
-                glyphs = "".join(prim_symbol(p) for p in prims)  # deterministic encode
-            else:                                         # fallback: trained Speaker
-                glyphs = P.sample(speaker_prompt({"prompt": _normalize(msg)}, CH), 1, greedy=True)[0]
+            glyphs = "".join(prim_symbol(p) for p in prims)
             translation = None
         if not glyphs:
-            return "The Speaker couldn't encode that — try phrasing it like the examples."
-        code = _extract_code(P.build(builder_prompt(CH.builder_text(glyphs))))
+            return "Couldn't map that to the 16 operations — try phrasing like the examples."
+        code = decode(glyphs)                             # language semantics → code (100% valid)
         r = run_tests(code, f"print(solve({DEMO_INPUT}))")
         ran = r["stdout"] if r["passed"] else "error: " + r["detail"][:80]
     except Exception as e:  # never crash the chat
