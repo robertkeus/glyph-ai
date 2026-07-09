@@ -22,7 +22,9 @@ from glyph.policy import LoraPolicy
 from glyph.tasks import load_tasks
 from glyph.verifier import run_tests
 
-MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct"
+import os
+
+MODEL = os.environ.get("GLYPH_MODEL", "Qwen/Qwen2.5-Coder-3B-Instruct")  # 1.5B for CPU hosting
 CH = Native()
 DEMO_INPUT = [3, -1, 2, 2, -5]
 P = None
