@@ -76,6 +76,27 @@ def to_code(keys):
     return "\n".join(lines + ["    return r"])
 
 
+JS = {  # same primitives rendered as JavaScript — symbols carry intent, not syntax
+    "evens": "r = r.filter(x => x % 2 === 0);", "pos": "r = r.filter(x => x > 0);",
+    "double": "r = r.map(x => x * 2);", "square": "r = r.map(x => x * x);",
+    "inc": "r = r.map(x => x + 1);", "negate": "r = r.map(x => -x);",
+    "absval": "r = r.map(x => Math.abs(x));", "rev": "r = r.slice().reverse();",
+    "sorta": "r = r.slice().sort((a, b) => a - b);", "sortd": "r = r.slice().sort((a, b) => b - a);",
+    "uniq": "r = [...new Set(r)];", "dec": "r = r.map(x => x - 1);",
+    "sum": "return r.reduce((a, b) => a + b, 0);", "max": "return r.length ? Math.max(...r) : 0;",
+    "len": "return r.length;", "cnt": "return r.length;",
+}
+
+
+def to_js(keys):
+    lines = ["function solve(xs) {", "  let r = [...xs];"]
+    for k in keys:
+        lines.append("  " + JS[k])
+        if JS[k].startswith("return"):
+            return "\n".join(lines + ["}"])
+    return "\n".join(lines + ["  return r;", "}"])
+
+
 def run(code):
     src = f"{code}\n\nprint(solve({DEMO}))\n"
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
@@ -194,6 +215,10 @@ def _respond(msg, history):
         code = to_code(keys)
         time.sleep(0.4)
         buf += f"\n🛠️ **Composing the code…**\n```python\n{code}\n```\n"
+        yield buf
+        time.sleep(0.4)
+        buf += (f"\n🌐 **Same message, different language** (the glyphs encode intent, "
+                f"not Python):\n```javascript\n{to_js(keys)}\n```\n")
         yield buf
         time.sleep(0.5)
         buf += f"\n▶️ **Running it:** `solve({DEMO})` → **`{run(code)}`**"

@@ -38,22 +38,22 @@ a{color:var(--accent)}
 </div>
 <script>
 const OPS=[
- {k:"evens",g:0x4e00,py:"r = [x for x in r if x % 2 == 0]",fn:r=>r.filter(x=>x%2===0),kw:["even"]},
- {k:"pos",g:0x4e01,py:"r = [x for x in r if x > 0]",fn:r=>r.filter(x=>x>0),kw:["positive"]},
- {k:"double",g:0x4e03,py:"r = [x * 2 for x in r]",fn:r=>r.map(x=>x*2),kw:["double","twice"]},
- {k:"square",g:0x4e07,py:"r = [x * x for x in r]",fn:r=>r.map(x=>x*x),kw:["square"]},
- {k:"inc",g:0x4e08,py:"r = [x + 1 for x in r]",fn:r=>r.map(x=>x+1),kw:["add one","increment","plus one"]},
- {k:"negate",g:0x4e09,py:"r = [-x for x in r]",fn:r=>r.map(x=>-x),kw:["negate","flip sign","flip the sign","invert"]},
- {k:"absval",g:0x4e0a,py:"r = [abs(x) for x in r]",fn:r=>r.map(x=>Math.abs(x)),kw:["absolute","abs value"]},
- {k:"rev",g:0x4e0b,py:"r = list(reversed(r))",fn:r=>[...r].reverse(),kw:["revers","backward","back to front"]},
- {k:"sorta",g:0x4e0d,py:"r = sorted(r)",fn:r=>[...r].sort((a,b)=>a-b),kw:["ascending","smallest to","low to high","increasing"]},
- {k:"sortd",g:0x4e0e,py:"r = sorted(r, reverse=True)",fn:r=>[...r].sort((a,b)=>b-a),kw:["descending","big to small","large to small","high to low","biggest to"]},
- {k:"uniq",g:0x4e0f,py:"r = list(dict.fromkeys(r))",fn:r=>[...new Set(r)],kw:["dedup","duplicate","unique","distinct"]},
- {k:"dec",g:0x4e10,py:"r = [x - 1 for x in r]",fn:r=>r.map(x=>x-1),kw:["subtract one","decrement","minus one"]},
- {k:"sum",g:0x4e11,py:"return sum(r)",fn:r=>r.reduce((a,b)=>a+b,0),red:1,kw:["sum","add up","total","add everything","add them"]},
- {k:"max",g:0x4e13,py:"return max(r) if r else 0",fn:r=>r.length?Math.max(...r):0,red:1,kw:["max","biggest","largest","top one","the top","highest"]},
- {k:"len",g:0x4e14,py:"return len(r)",fn:r=>r.length,red:1,kw:["how many","length","size"]},
- {k:"cnt",g:0x4e15,py:"return sum(1 for _ in r)",fn:r=>r.length,red:1,kw:["count","number of"]},
+ {k:"evens",js:"r = r.filter(x => x % 2 === 0);",g:0x4e00,py:"r = [x for x in r if x % 2 == 0]",fn:r=>r.filter(x=>x%2===0),kw:["even"]},
+ {k:"pos",js:"r = r.filter(x => x > 0);",g:0x4e01,py:"r = [x for x in r if x > 0]",fn:r=>r.filter(x=>x>0),kw:["positive"]},
+ {k:"double",js:"r = r.map(x => x * 2);",g:0x4e03,py:"r = [x * 2 for x in r]",fn:r=>r.map(x=>x*2),kw:["double","twice"]},
+ {k:"square",js:"r = r.map(x => x * x);",g:0x4e07,py:"r = [x * x for x in r]",fn:r=>r.map(x=>x*x),kw:["square"]},
+ {k:"inc",js:"r = r.map(x => x + 1);",g:0x4e08,py:"r = [x + 1 for x in r]",fn:r=>r.map(x=>x+1),kw:["add one","increment","plus one"]},
+ {k:"negate",js:"r = r.map(x => -x);",g:0x4e09,py:"r = [-x for x in r]",fn:r=>r.map(x=>-x),kw:["negate","flip sign","flip the sign","invert"]},
+ {k:"absval",js:"r = r.map(x => Math.abs(x));",g:0x4e0a,py:"r = [abs(x) for x in r]",fn:r=>r.map(x=>Math.abs(x)),kw:["absolute","abs value"]},
+ {k:"rev",js:"r = r.slice().reverse();",g:0x4e0b,py:"r = list(reversed(r))",fn:r=>[...r].reverse(),kw:["revers","backward","back to front"]},
+ {k:"sorta",js:"r = r.slice().sort((a, b) => a - b);",g:0x4e0d,py:"r = sorted(r)",fn:r=>[...r].sort((a,b)=>a-b),kw:["ascending","smallest to","low to high","increasing"]},
+ {k:"sortd",js:"r = r.slice().sort((a, b) => b - a);",g:0x4e0e,py:"r = sorted(r, reverse=True)",fn:r=>[...r].sort((a,b)=>b-a),kw:["descending","big to small","large to small","high to low","biggest to"]},
+ {k:"uniq",js:"r = [...new Set(r)];",g:0x4e0f,py:"r = list(dict.fromkeys(r))",fn:r=>[...new Set(r)],kw:["dedup","duplicate","unique","distinct"]},
+ {k:"dec",js:"r = r.map(x => x - 1);",g:0x4e10,py:"r = [x - 1 for x in r]",fn:r=>r.map(x=>x-1),kw:["subtract one","decrement","minus one"]},
+ {k:"sum",js:"return r.reduce((a, b) => a + b, 0);",g:0x4e11,py:"return sum(r)",fn:r=>r.reduce((a,b)=>a+b,0),red:1,kw:["sum","add up","total","add everything","add them"]},
+ {k:"max",js:"return r.length ? Math.max(...r) : 0;",g:0x4e13,py:"return max(r) if r else 0",fn:r=>r.length?Math.max(...r):0,red:1,kw:["max","biggest","largest","top one","the top","highest"]},
+ {k:"len",js:"return r.length;",g:0x4e14,py:"return len(r)",fn:r=>r.length,red:1,kw:["how many","length","size"]},
+ {k:"cnt",js:"return r.length;",g:0x4e15,py:"return sum(1 for _ in r)",fn:r=>r.length,red:1,kw:["count","number of"]},
 ];
 const SAMPLE=[3,-1,2,2,-5];
 const EX=["keep positives, square them, then sum","sort big to small and give the top one",
@@ -67,6 +67,8 @@ function parse(text){const t=text.toLowerCase(),hits=[];
  for(const[,op]of hits)if(!seen.has(op.k)){seen.add(op.k);ops.push(op);}return ops;}
 function toCode(ops){const L=["def solve(xs):","    r = list(xs)"];
  for(const op of ops){L.push("    "+op.py);if(op.red)return L.join("\n");}return L.concat(["    return r"]).join("\n");}
+function toJs(ops){const L=["function solve(xs) {","  let r = [...xs];"];
+ for(const op of ops){L.push("  "+op.js);if(op.red)return L.concat(["}"]).join("\n");}return L.concat(["  return r;","}"]).join("\n");}
 function runJs(ops){let r=SAMPLE.slice();for(const op of ops){r=op.fn(r);if(op.red)return r;}return r;}
 const log=document.getElementById("log");
 function bubble(cls,html){const d=document.createElement("div");d.className="msg "+cls;d.innerHTML=html;
@@ -76,7 +78,8 @@ function reply(text){
  if(!ops.length){bubble("a","<span class='err'>I didn't spot any of my 16 operations — try wording like the suggestions.</span>");return;}
  const glyphs=ops.map(o=>alien(o.g)).join(""),gb=ops.length*2,eb=new Blob([text]).size,cut=Math.round((1-gb/eb)*100);
  bubble("a",`<div class="lbl">glyph message</div><div class="glyph">${glyphs}</div>
-  <div class="lbl">working code</div><pre>${esc(toCode(ops))}</pre>
+  <div class="lbl">working code — Python</div><pre>${esc(toCode(ops))}</pre>
+  <div class="lbl">same message — JavaScript (symbols carry intent, not syntax)</div><pre>${esc(toJs(ops))}</pre>
   <div class="run">solve(${fmt(SAMPLE)}) &rarr; ${esc(fmt(runJs(ops)))}</div>
   <div class="bytes">${gb} bytes vs ${eb} — ${cut}% smaller</div>`);
 }
