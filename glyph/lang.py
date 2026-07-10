@@ -9,7 +9,7 @@ v1 (taskgen.py) stays untouched; this module generates the scaled bank.
 """
 from dataclasses import dataclass, field
 
-# types: IL=int list, SL=str list, I=int, S=str, B=bool
+# types: IL=int list, SL=str list, RL=record list ({name,age}), I=int, S=str, B=bool
 
 
 @dataclass(frozen=True)
@@ -150,10 +150,152 @@ _p("longest", "SL", "S", "return max(r, key=len) if r else ''",
     "find the longest one, defaulting to empty"],
    lambda r: max(r, key=len) if r else "", ends=True)
 
+# ---- more int-list -> int-list -------------------------------------------------
+_p("div3", "IL", "IL", "r = [x for x in r if x % 3 == 0]", "r = r.filter(x => x % 3 === 0);",
+   ["keep multiples of three", "keep values divisible by 3", "drop anything not divisible by three"],
+   lambda r: [x for x in r if x % 3 == 0])
+_p("cube", "IL", "IL", "r = [x ** 3 for x in r]", "r = r.map(x => x ** 3);",
+   ["cube each", "raise each to the third power", "multiply each by itself twice"],
+   lambda r: [x ** 3 for x in r])
+_p("sortabs", "IL", "IL", "r = sorted(r, key=abs)", "r = r.slice().sort((a, b) => Math.abs(a) - Math.abs(b));",
+   ["sort by absolute value", "order by distance from zero", "arrange by magnitude ignoring sign"],
+   lambda r: sorted(r, key=abs))
+_p("last3", "IL", "IL", "r = r[-3:]", "r = r.slice(-3);",
+   ["keep only the last three", "take the final 3 elements", "truncate to the last three items"],
+   lambda r: r[-3:])
+_p("trimends", "IL", "IL", "r = r[1:-1]", "r = r.slice(1, -1);",
+   ["drop the first and last elements", "remove both ends", "trim one element off each end"],
+   lambda r: r[1:-1])
+_p("gt5", "IL", "IL", "r = [x for x in r if x > 5]", "r = r.filter(x => x > 5);",
+   ["keep values greater than five", "drop anything 5 or below", "keep only numbers above 5"],
+   lambda r: [x for x in r if x > 5])
+_p("add10", "IL", "IL", "r = [x + 10 for x in r]", "r = r.map(x => x + 10);",
+   ["add ten to each", "increase every value by 10", "shift each up by ten"],
+   lambda r: [x + 10 for x in r])
+_p("dropzeros", "IL", "IL", "r = [x for x in r if x != 0]", "r = r.filter(x => x !== 0);",
+   ["drop the zeros", "remove all zero values", "keep only non-zero numbers"],
+   lambda r: [x for x in r if x != 0])
+
+# ---- control-flow shapes (IL -> IL) --------------------------------------------
+_p("takewhilepos", "IL", "IL",
+   "r = r[:next((i for i, x in enumerate(r) if x <= 0), len(r))]",
+   "{ const i = r.findIndex(x => x <= 0); r = i < 0 ? r : r.slice(0, i); }",
+   ["take values while they are positive", "keep the leading run of positive numbers",
+    "stop at the first non-positive value"],
+   lambda r: r[:next((i for i, x in enumerate(r) if x <= 0), len(r))])
+_p("dropwhileneg", "IL", "IL",
+   "r = r[next((i for i, x in enumerate(r) if x >= 0), len(r)):]",
+   "{ const i = r.findIndex(x => x >= 0); r = i < 0 ? [] : r.slice(i); }",
+   ["drop the leading negative values", "skip negatives at the start",
+    "remove the initial run of negative numbers"],
+   lambda r: r[next((i for i, x in enumerate(r) if x >= 0), len(r)):])
+_p("beforezero", "IL", "IL",
+   "r = r[:r.index(0)] if 0 in r else r",
+   "{ const i = r.indexOf(0); r = i < 0 ? r : r.slice(0, i); }",
+   ["keep everything before the first zero", "cut the list at the first zero",
+    "take values up to (excluding) the first zero"],
+   lambda r: r[:r.index(0)] if 0 in r else r)
+
+# ---- defaults / error paths (IL -> IL) ------------------------------------------
+_p("oremptyzero", "IL", "IL", "r = r if r else [0]", "r = r.length ? r : [0];",
+   ["if empty, use a single zero", "default to [0] when there is nothing",
+    "replace an empty list with one zero"],
+   lambda r: r if r else [0])
+_p("padto3", "IL", "IL", "r = r + [0] * (3 - len(r)) if len(r) < 3 else r",
+   "r = r.length < 3 ? r.concat(Array(3 - r.length).fill(0)) : r;",
+   ["pad with zeros to at least three elements", "extend to length 3 using zeros",
+    "ensure at least three items by appending zeros"],
+   lambda r: r + [0] * (3 - len(r)) if len(r) < 3 else r)
+
+# ---- predicates (IL -> B, reducers) ----------------------------------------------
+_p("anyeven", "IL", "B", "return any(x % 2 == 0 for x in r)", "return r.some(x => x % 2 === 0);",
+   ["return whether any value is even", "check if there is an even number", "true if at least one even value"],
+   lambda r: any(x % 2 == 0 for x in r), ends=True)
+_p("allpos", "IL", "B", "return all(x > 0 for x in r)", "return r.every(x => x > 0);",
+   ["return whether all values are positive", "check if every number is above zero", "true only if all are positive"],
+   lambda r: all(x > 0 for x in r), ends=True)
+_p("haszero", "IL", "B", "return 0 in r", "return r.includes(0);",
+   ["return whether the list contains a zero", "check if zero appears", "true if any value equals zero"],
+   lambda r: 0 in r, ends=True)
+_p("issorted", "IL", "B", "return r == sorted(r)", "return r.every((x, i) => i === 0 || r[i-1] <= x);",
+   ["return whether the list is sorted ascending", "check if values are in increasing order",
+    "true if already sorted smallest to largest"],
+   lambda r: r == sorted(r), ends=True)
+_p("alldistinct", "IL", "B", "return len(r) == len(set(r))", "return new Set(r).size === r.length;",
+   ["return whether all values are distinct", "check that there are no duplicates", "true if every value is unique"],
+   lambda r: len(r) == len(set(r)), ends=True)
+
+# ---- more int reducers ------------------------------------------------------------
+_p("prod", "IL", "I", "return __import__('math').prod(r)", "return r.reduce((a, b) => a * b, 1);",
+   ["return their product", "multiply them all together", "give back the product of all values"],
+   lambda r: __import__('math').prod(r), ends=True)
+_p("firsteven", "IL", "I", "return next((x for x in r if x % 2 == 0), 0)",
+   "return r.find(x => x % 2 === 0) ?? 0;",
+   ["return the first even value (0 if none)", "find the first even number, defaulting to 0",
+    "give the earliest even value or zero"],
+   lambda r: next((x for x in r if x % 2 == 0), 0), ends=True)
+_p("counteven", "IL", "I", "return sum(1 for x in r if x % 2 == 0)",
+   "return r.filter(x => x % 2 === 0).length;",
+   ["return how many values are even", "count the even numbers", "give the number of evens"],
+   lambda r: sum(1 for x in r if x % 2 == 0), ends=True)
+
+# ---- more string ops ---------------------------------------------------------------
+_p("title", "SL", "SL", "r = [s.title() for s in r]",
+   "r = r.map(s => s.replace(/\\w\\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()));",
+   ["title-case each string", "capitalize each word", "convert each to Title Case"],
+   lambda r: [s.title() for s in r])
+_p("sortalpha", "SL", "SL", "r = sorted(r)", "r = r.slice().sort();",
+   ["sort alphabetically", "order the strings A to Z", "arrange in lexicographic order"],
+   lambda r: sorted(r))
+_p("dropshort", "SL", "SL", "r = [s for s in r if len(s) >= 3]", "r = r.filter(s => s.length >= 3);",
+   ["drop strings shorter than three characters", "keep only strings of length 3 or more",
+    "remove short strings (under 3 chars)"],
+   lambda r: [s for s in r if len(s) >= 3])
+_p("prefixup", "SL", "SL", "r = ['#' + s for s in r]", "r = r.map(s => '#' + s);",
+   ["prefix each with a hash", "add '#' to the start of each string", "prepend a hash mark to each"],
+   lambda r: ['#' + s for s in r])
+
+# ---- string predicates / reducers ----------------------------------------------------
+_p("anyempty", "SL", "B", "return any(s == '' for s in r)", "return r.some(s => s === '');",
+   ["return whether any string is empty", "check for an empty string", "true if a blank string is present"],
+   lambda r: any(s == '' for s in r), ends=True)
+_p("maxlen", "SL", "I", "return max((len(s) for s in r), default=0)",
+   "return r.reduce((a, s) => Math.max(a, s.length), 0);",
+   ["return the length of the longest string (0 if none)", "give the maximum string length",
+    "find how long the longest string is"],
+   lambda r: max((len(s) for s in r), default=0), ends=True)
+
+# ---- record ops (RL: {name, age}) ------------------------------------------------------
+_p("ages", "RL", "IL", "r = [d['age'] for d in r]", "r = r.map(d => d.age);",
+   ["extract the ages", "pluck the age field from each record", "keep just each person's age"],
+   lambda r: [d['age'] for d in r])
+_p("names", "RL", "SL", "r = [d['name'] for d in r]", "r = r.map(d => d.name);",
+   ["extract the names", "pluck the name field from each record", "keep just each person's name"],
+   lambda r: [d['name'] for d in r])
+_p("adults", "RL", "RL", "r = [d for d in r if d['age'] >= 18]", "r = r.filter(d => d.age >= 18);",
+   ["keep only adults (age 18+)", "filter to records with age at least 18", "drop anyone under eighteen"],
+   lambda r: [d for d in r if d['age'] >= 18])
+_p("sortage", "RL", "RL", "r = sorted(r, key=lambda d: d['age'])",
+   "r = r.slice().sort((a, b) => a.age - b.age);",
+   ["sort records by age, youngest first", "order the people by age ascending", "arrange records from youngest to oldest"],
+   lambda r: sorted(r, key=lambda d: d['age']))
+_p("countrl", "RL", "I", "return len(r)", "return r.length;",
+   ["return how many records remain", "count the records", "give the number of people"],
+   lambda r: len(r), ends=True)
+_p("oldest", "RL", "S", "return max(r, key=lambda d: d['age'])['name'] if r else ''",
+   "return r.length ? r.reduce((a, d) => d.age > a.age ? d : a).name : '';",
+   ["return the name of the oldest person (empty if none)", "find who is oldest and give their name",
+    "give the oldest record's name, defaulting to empty"],
+   lambda r: max(r, key=lambda d: d['age'])['name'] if r else '', ends=True)
+
 BY_KEY = {p.key: p for p in P}
 INPUTS = {
     "IL": [[1, 2, 3, 4], [], [-2, -1, 0, 1, 2], [5, 5, 5], [3, 1, 2], [10], [2, 4, 6], [-7, 12, -7]],
     "SL": [["Hello", "world"], [], ["  a ", "", "BC", "bc"], ["one", "one", "Two"], ["x"], ["abc", "de", ""]],
+    "RL": [[{"name": "Ada", "age": 36}, {"name": "Bo", "age": 12}],
+           [],
+           [{"name": "Cy", "age": 18}, {"name": "Dee", "age": 65}, {"name": "El", "age": 17}],
+           [{"name": "Fi", "age": 41}]],
 }
 
 
@@ -195,8 +337,10 @@ def run_chain(keys, value):
     return r
 
 
+NOUN = {"IL": "a list of integers", "SL": "a list of strings",
+        "RL": "a list of people records (name, age)"}
+
+
 def english(keys, variant=0):
     parts = [BY_KEY[k].en[variant % len(BY_KEY[k].en)] for k in keys]
-    tin = BY_KEY[keys[0]].tin
-    noun = "a list of integers" if tin == "IL" else "a list of strings"
-    return f"Take {noun}; " + ", then ".join(parts) + "."
+    return f"Take {NOUN[BY_KEY[keys[0]].tin]}; " + ", then ".join(parts) + "."

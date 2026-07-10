@@ -14,7 +14,7 @@ import random
 from glyph.lang import BY_KEY, INPUTS, compose, english, run_chain, solution_py
 from glyph.tasks import ROOT
 
-ZEROSHOT = ("halve", "revstr", "range_")   # symbols never seen in training
+ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults")  # never seen in training (one per family)
 RNG = random.Random(0)
 
 
@@ -42,7 +42,7 @@ def chains(max_len=3):
     return out
 
 
-def build(train_frac=0.7, cap_per_len=(None, 1500, 3000)):
+def build(train_frac=0.7, cap_per_len=(None, 3000, 6000)):
     """Returns (tasks, stats). Zero-shot chains split out first; the rest split
     train/heldout_comp by combo. Per-length caps keep the bank tractable."""
     all_chains = chains()
