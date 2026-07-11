@@ -22,6 +22,11 @@ button{background:#7cdfff;color:#04222c;border:0;border-radius:10px;padding:0 1r
 <button onclick="send()">Send</button></div>
 <script>
 const API = "https://robertkeus-glyph-v2.hf.space/gradio_api/call/glyph";
+// Your HF token (any read token) → your PRO ZeroGPU quota. Stored ONLY in this browser.
+let TOKEN = localStorage.getItem("hf_token") || "";
+if(!TOKEN){ TOKEN = prompt("Paste your Hugging Face token (hf_...) — stays in your browser only:") || "";
+            if(TOKEN) localStorage.setItem("hf_token", TOKEN); }
+const HDRS = () => ({"Content-Type":"application/json", ...(TOKEN?{"Authorization":"Bearer "+TOKEN}:{})});
 const log = document.getElementById("log"), q = document.getElementById("q");
 const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 function bubble(cls, html){const d=document.createElement("div");d.className="m "+cls;d.innerHTML=html;
@@ -29,10 +34,10 @@ function bubble(cls, html){const d=document.createElement("div");d.className="m 
 
 async function callGlyph(msg){
   // Gradio REST: POST returns {event_id}; GET streams the result as SSE
-  const r = await fetch(API, {method:"POST", headers:{"Content-Type":"application/json"},
+  const r = await fetch(API, {method:"POST", headers: HDRS(),
                               body: JSON.stringify({data:[msg]})});
   const {event_id} = await r.json();
-  const txt = await (await fetch(`${API}/${event_id}`)).text();
+  const txt = await (await fetch(`${API}/${event_id}`, {headers: HDRS()})).text();
   const line = txt.split("\n").find(l => l.startsWith("data:"));
   return JSON.parse(line.slice(5))[0];
 }
