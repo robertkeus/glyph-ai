@@ -25,10 +25,10 @@ PROMPT = {
 }
 
 tok = AutoTokenizer.from_pretrained(BASE)
-model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.bfloat16)  # CPU first
-model = PeftModel.from_pretrained(model, ADAPTER, subfolder="v2")                # adapter on CPU
-model = model.to("cuda")   # ZeroGPU-patched transfer (no CUDA exists before this)
+model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.float32)  # CPU-safe dtype
+model = PeftModel.from_pretrained(model, ADAPTER, subfolder="v2")
 model.eval()
+_dev = {"d": "cpu"}  # moved to cuda lazily inside the GPU context if available
 
 # wire glyphs are CJK (0x4E00 block); display remap to syllabics (0x1400) = alien look
 _A, _C = 0x1400, 0x4E00
@@ -39,7 +39,11 @@ is_glyphs = lambda s: all(0x4E00 <= ord(c) <= 0x9FFF for c in s)
 
 @spaces.GPU
 def gen(prompt, max_new):
-    enc = tok(prompt, return_tensors="pt", add_special_tokens=False).to("cuda")
+    global model
+    if _dev["d"] == "cpu" and torch.cuda.is_available():
+        model = model.to("cuda", dtype=torch.bfloat16)
+        _dev["d"] = "cuda"
+    enc = tok(prompt, return_tensors="pt", add_special_tokens=False).to(_dev["d"])
     with torch.no_grad():
         out = model.generate(**enc, max_new_tokens=max_new, do_sample=False,
                              pad_token_id=tok.eos_token_id)
