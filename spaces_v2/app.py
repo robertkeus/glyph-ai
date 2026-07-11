@@ -86,11 +86,33 @@ def respond(msg, _history):
         return f"⚠️ {type(e).__name__}: {str(e)[:150]}"
 
 
+def api_json(msg):
+    """Structured endpoint for custom clients: {glyphs, alien, english, code, result}."""
+    msg = (msg or "").strip()[:300]
+    raw = unalien(msg)
+    try:
+        glyphs = raw if is_glyphs(raw) else gen(PROMPT["speaker"].format(x=msg), 24)
+        if not glyphs or not is_glyphs(glyphs):
+            return {"error": "speaker produced no valid glyphs", "got": glyphs[:40]}
+        code = gen(PROMPT["builder"].format(x=glyphs), 200)
+        return {"glyphs": glyphs, "alien": alien(glyphs), "bytes": 2 * len(glyphs),
+                "english": gen(PROMPT["translator"].format(x=glyphs), 60),
+                "code": code, "result": run_code(code)}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:150]}"}
+
+
 EX = ["keep the positive numbers, square each, then return their sum",
       "drop duplicates, sort descending",
       "keep multiples of three, then count them",
       "take the absolute value of each, sort ascending, return the maximum (0 if empty)"]
 
-gr.ChatInterface(respond, examples=EX, title="Glyph v2 — live finetuned model",
-                 description="Every reply is the real trained pipeline: speaker → glyphs "
-                             "→ builder → executed Python. (builder 99.5% held-out)").launch()
+with gr.Blocks(title="Glyph v2") as demo:
+    gr.ChatInterface(respond, examples=EX, title="Glyph v2 — live finetuned model",
+                     description="Every reply is the real trained pipeline: speaker → glyphs "
+                                 "→ builder → executed Python. (builder 99.5% held-out)")
+    _i = gr.Textbox(visible=False)
+    _o = gr.JSON(visible=False)
+    _b = gr.Button(visible=False)
+    _b.click(api_json, _i, _o, api_name="glyph")   # POST /gradio_api/call/glyph
+demo.launch()
