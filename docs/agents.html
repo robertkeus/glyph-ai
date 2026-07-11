@@ -152,5 +152,5 @@ const chips=document.getElementById("chips");
 EX.forEach(e=>{const c=document.createElement("span");c.className="chip";c.textContent=e;
  c.onclick=()=>go(e);chips.appendChild(c)});
 document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")go()});
-setTimeout(()=>go(EX[0]),600);
+document.getElementById("q").focus();
 </script></body></html>
