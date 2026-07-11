@@ -17,11 +17,13 @@ class Prim:
     key: str
     tin: str            # input type
     tout: str           # output type
-    py: str             # one code line operating on r / returning
+    py: str             # one code line operating on r / returning ({a} template if slots)
     js: str
-    en: list            # paraphrase phrasings (variant 0 = canonical)
-    fn: object          # executable semantics
+    en: list            # paraphrase phrasings (variant 0 = canonical; {a} template if slots)
+    fn: object          # executable semantics (slots: fn(a) -> callable)
     ends: bool = field(default=False)  # reducer/terminal (emits return)
+    slots: int = field(default=0)      # 1 = takes one small-int operand
+    args: tuple = field(default=())    # operand sample pool for bank generation
 
 
 P = []
@@ -29,6 +31,18 @@ P = []
 
 def _p(key, tin, tout, py, js, en, fn, ends=False):
     P.append(Prim(key, tin, tout, py, js, en, fn, ends))
+
+
+def _pa(key, tin, tout, py, js, en, fn, args, ends=False):
+    P.append(Prim(key, tin, tout, py, js, en, fn, ends, slots=1, args=args))
+
+
+def parse(item):
+    """Chain item -> (key, arg): 'gtn:7' -> ('gtn', 7); 'evens' -> ('evens', None)."""
+    if ":" in item:
+        k, a = item.split(":")
+        return k, int(a)
+    return item, None
 
 
 # ---- int-list -> int-list (v1 family, re-declared with types) ----------------
@@ -288,6 +302,50 @@ _p("oldest", "RL", "S", "return max(r, key=lambda d: d['age'])['name'] if r else
     "give the oldest record's name, defaulting to empty"],
    lambda r: max(r, key=lambda d: d['age'])['name'] if r else '', ends=True)
 
+# ---- parameterized primitives (opcode + operand slot; appended so v2 glyph ----
+# ---- indices 0-67 stay stable). Operand rides the wire as digit glyphs. -------
+_pa("firstn", "IL", "IL", "r = r[:{a}]", "r = r.slice(0, {a});",
+    ["keep only the first {a}", "take the first {a} elements", "truncate to {a} items"],
+    lambda a: lambda r: r[:a], (1, 2, 4))
+_pa("lastn", "IL", "IL", "r = r[-{a}:]", "r = r.slice(-{a});",
+    ["keep only the last {a}", "take the final {a} elements", "truncate to the last {a} items"],
+    lambda a: lambda r: r[-a:], (1, 2))
+_pa("gtn", "IL", "IL", "r = [x for x in r if x > {a}]", "r = r.filter(x => x > {a});",
+    ["keep values greater than {a}", "drop anything {a} or below", "keep only numbers above {a}"],
+    lambda a: lambda r: [x for x in r if x > a], (2, 3, 7))
+_pa("ltn", "IL", "IL", "r = [x for x in r if x < {a}]", "r = r.filter(x => x < {a});",
+    ["keep values less than {a}", "drop anything {a} or above", "keep only numbers below {a}"],
+    lambda a: lambda r: [x for x in r if x < a], (3, 8))
+_pa("addn", "IL", "IL", "r = [x + {a} for x in r]", "r = r.map(x => x + {a});",
+    ["add {a} to each", "increase every value by {a}", "shift each up by {a}"],
+    lambda a: lambda r: [x + a for x in r], (2, 5, 100))
+_pa("muln", "IL", "IL", "r = [x * {a} for x in r]", "r = r.map(x => x * {a});",
+    ["multiply each by {a}", "scale every value by {a}", "make each {a} times as big"],
+    lambda a: lambda r: [x * a for x in r], (3, 10))
+_pa("divisn", "IL", "IL", "r = [x for x in r if x % {a} == 0]", "r = r.filter(x => x % {a} === 0);",
+    ["keep multiples of {a}", "keep values divisible by {a}", "drop anything not divisible by {a}"],
+    lambda a: lambda r: [x for x in r if x % a == 0], (4, 5))
+_pa("clampn", "IL", "IL", "r = [min(x, {a}) for x in r]", "r = r.map(x => Math.min(x, {a}));",
+    ["cap each value at {a}", "clamp each to at most {a}", "limit every value to {a}"],
+    lambda a: lambda r: [min(x, a) for x in r], (3, 7))
+_pa("nthn", "IL", "I", "return r[{a}] if len(r) > {a} else 0",
+    "return r.length > {a} ? r[{a}] : 0;",
+    ["return the element at index {a} (0 if missing)", "give the value in position {a}, defaulting to 0",
+     "return item number {a} counting from zero, or 0"],
+    lambda a: lambda r: r[a] if len(r) > a else 0, (0, 1, 2), ends=True)
+_pa("minlenn", "SL", "SL", "r = [s for s in r if len(s) >= {a}]", "r = r.filter(s => s.length >= {a});",
+    ["drop strings shorter than {a} characters", "keep only strings of length {a} or more",
+     "remove strings under {a} characters"],
+    lambda a: lambda r: [s for s in r if len(s) >= a], (2, 4))
+_pa("takechn", "SL", "SL", "r = [s[:{a}] for s in r]", "r = r.map(s => s.slice(0, {a}));",
+    ["keep the first {a} characters of each", "truncate each string to {a} characters",
+     "cut every string down to its first {a} characters"],
+    lambda a: lambda r: [s[:a] for s in r], (1, 2, 3))
+_pa("minagen", "RL", "RL", "r = [d for d in r if d['age'] >= {a}]", "r = r.filter(d => d.age >= {a});",
+    ["keep only people aged {a} or over", "filter to records with age at least {a}",
+     "drop anyone under {a}"],
+    lambda a: lambda r: [d for d in r if d['age'] >= a], (18, 21, 40, 65))
+
 BY_KEY = {p.key: p for p in P}
 INPUTS = {
     "IL": [[1, 2, 3, 4], [], [-2, -1, 0, 1, 2], [5, 5, 5], [3, 1, 2], [10], [2, 4, 6], [-7, 12, -7]],
@@ -299,21 +357,35 @@ INPUTS = {
 }
 
 
+def _inst(keys):
+    """Chain items -> [(Prim, arg)] or None if an arg is missing/spurious."""
+    out = []
+    for item in keys:
+        k, a = parse(item)
+        p = BY_KEY[k]
+        if bool(p.slots) != (a is not None):
+            return None
+        out.append((p, a))
+    return out
+
+
 def compose(keys):
     """Type-check a chain; returns the chain's input type or None if ill-typed."""
-    prims = [BY_KEY[k] for k in keys]
-    for i, p in enumerate(prims):
-        if i and prims[i - 1].tout != p.tin:
+    prims = _inst(keys)
+    if not prims:
+        return None
+    for i, (p, _) in enumerate(prims):
+        if i and prims[i - 1][0].tout != p.tin:
             return None
         if p.ends and i != len(prims) - 1:
             return None                      # reducer only at the end
-    return prims[0].tin
+    return prims[0][0].tin
 
 
 def solution_py(keys, name="solve"):
     lines = [f"def {name}(xs):", "    r = list(xs)"]
-    for p in (BY_KEY[k] for k in keys):
-        lines.append("    " + p.py)
+    for p, a in _inst(keys):
+        lines.append("    " + (p.py.format(a=a) if p.slots else p.py))
         if p.ends:
             return "\n".join(lines)
     return "\n".join(lines + ["    return r"])
@@ -321,8 +393,8 @@ def solution_py(keys, name="solve"):
 
 def solution_js(keys):
     lines = ["function solve(xs) {", "  let r = [...xs];"]
-    for p in (BY_KEY[k] for k in keys):
-        lines.append("  " + p.js)
+    for p, a in _inst(keys):
+        lines.append("  " + (p.js.format(a=a) if p.slots else p.js))
         if p.ends:
             return "\n".join(lines + ["}"])
     return "\n".join(lines + ["  return r;", "}"])
@@ -330,8 +402,8 @@ def solution_js(keys):
 
 def run_chain(keys, value):
     r = list(value)
-    for p in (BY_KEY[k] for k in keys):
-        r = p.fn(r)
+    for p, a in _inst(keys):
+        r = (p.fn(a) if p.slots else p.fn)(r)
         if p.ends:
             return r
     return r
@@ -342,5 +414,8 @@ NOUN = {"IL": "a list of integers", "SL": "a list of strings",
 
 
 def english(keys, variant=0):
-    parts = [BY_KEY[k].en[variant % len(BY_KEY[k].en)] for k in keys]
-    return f"Take {NOUN[BY_KEY[keys[0]].tin]}; " + ", then ".join(parts) + "."
+    parts = []
+    for p, a in _inst(keys):
+        t = p.en[variant % len(p.en)]
+        parts.append(t.format(a=a) if p.slots else t)
+    return f"Take {NOUN[BY_KEY[parse(keys[0])[0]].tin]}; " + ", then ".join(parts) + "."

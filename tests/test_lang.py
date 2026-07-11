@@ -6,7 +6,7 @@ import unittest
 
 from glyph.agents import grade
 from glyph.bankgen import ZEROSHOT, build
-from glyph.lang import INPUTS, compose, run_chain, solution_js
+from glyph.lang import INPUTS, compose, parse, run_chain, solution_js
 
 TASKS, _ = build()
 RNG = random.Random(1)
@@ -41,13 +41,14 @@ class TestLang(unittest.TestCase):
     def test_splits_sound(self):
         train_combos = {tuple(t["primitives"]) for t in TASKS if t["split"] == "train"}
         for t in TASKS:
+            bases = [parse(k)[0] for k in t["primitives"]]
             if t["split"] == "heldout_comp":
                 self.assertNotIn(tuple(t["primitives"]), train_combos, t["id"])
-                self.assertFalse(any(k in ZEROSHOT for k in t["primitives"]))
+                self.assertFalse(any(k in ZEROSHOT for k in bases))
             if t["split"] == "train":
-                self.assertFalse(any(k in ZEROSHOT for k in t["primitives"]), t["id"])
+                self.assertFalse(any(k in ZEROSHOT for k in bases), t["id"])
             if t["split"] == "heldout_zeroshot":
-                self.assertTrue(any(k in ZEROSHOT for k in t["primitives"]), t["id"])
+                self.assertTrue(any(k in ZEROSHOT for k in bases), t["id"])
 
 
 if __name__ == "__main__":

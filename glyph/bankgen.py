@@ -11,16 +11,21 @@ import itertools
 import json
 import random
 
-from glyph.lang import BY_KEY, INPUTS, compose, english, run_chain, solution_py
+from glyph.lang import BY_KEY, INPUTS, compose, english, parse, run_chain, solution_py
 from glyph.tasks import ROOT
 
-ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults")  # never seen in training (one per family)
+# never seen in training (one per family; ltn = a zero-shot SLOTTED opcode)
+ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults", "ltn")
 RNG = random.Random(0)
+
+
+def _bases(keys):
+    return [parse(k)[0] for k in keys]
 
 
 def _task(keys, split):
     tin = compose(keys)
-    name = "op_" + "_".join(keys)
+    name = "op_" + "_".join(k.replace(":", "") for k in keys)
     tests = "\n".join(
         f"assert {name}({inp!r}) == {run_chain(keys, inp)!r}" for inp in INPUTS[tin]
     )
@@ -33,11 +38,12 @@ def _task(keys, split):
 
 
 def chains(max_len=3):
-    keys = list(BY_KEY)
+    keys = [f"{k}:{a}" if p.slots else k
+            for k, p in BY_KEY.items() for a in (p.args or (None,))]
     out = []
     for n in range(1, max_len + 1):
         for combo in itertools.product(keys, repeat=n):
-            if len(set(combo)) == n and compose(combo):
+            if len(set(_bases(combo))) == n and compose(combo):
                 out.append(combo)
     return out
 
@@ -46,8 +52,9 @@ def build(train_frac=0.7, cap_per_len=(None, 3000, 6000)):
     """Returns (tasks, stats). Zero-shot chains split out first; the rest split
     train/heldout_comp by combo. Per-length caps keep the bank tractable."""
     all_chains = chains()
-    zs = [c for c in all_chains if any(k in ZEROSHOT for k in c)]
-    rest = [c for c in all_chains if c not in set(zs)]
+    zs = [c for c in all_chains if any(k in ZEROSHOT for k in _bases(c))]
+    zs_set = set(zs)
+    rest = [c for c in all_chains if c not in zs_set]
 
     by_len = {}
     for c in rest:
@@ -75,7 +82,7 @@ def build(train_frac=0.7, cap_per_len=(None, 3000, 6000)):
 
 def main():
     tasks, stats = build()
-    path = ROOT / "tasks" / "bank2.jsonl"
+    path = ROOT / "tasks" / "bank3.jsonl"
     path.write_text("\n".join(json.dumps(t, ensure_ascii=False) for t in tasks) + "\n")
     print(f"{len(tasks)} tasks -> {path.name}  {stats}")
 
