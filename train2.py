@@ -29,7 +29,9 @@ from glyph.tasks import ROOT
 MODEL = os.environ.get("GLYPH_MODEL", "Qwen/Qwen2.5-Coder-3B-Instruct")
 SMOKE = bool(os.environ.get("SMOKE"))
 OUT = "/kaggle/working/glyph_v2_adapter" if os.path.isdir("/kaggle") else "/tmp/glyph_v2_adapter"
-EPOCHS, BATCH, LR, EVAL_N = (1, 8, 2e-4, 40) if SMOKE else (3, 16, 2e-4, 200)
+EPOCHS, BATCH, LR, EVAL_N = (1, 8, 2e-4, 40) if SMOKE else (3, 8, 2e-4, 200)
+ACCUM = 1 if SMOKE else 2
+MAXLEN = 384
 MAXPAIRS = 3000 if SMOKE else None
 
 PROMPT = {
@@ -101,6 +103,10 @@ def main():
         by_split.setdefault(t["split"], []).append(t)
 
     data = [encode(r) for r in rows]
+    n0 = len(data)
+    data = [d for d in data if len(d[0]) <= MAXLEN]
+    if len(data) < n0:
+        print(f"dropped {n0 - len(data)} pairs over {MAXLEN} tokens")
     dl = DataLoader(data, batch_size=BATCH, shuffle=True, collate_fn=collate)
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=LR)
@@ -115,11 +121,12 @@ def main():
             ids, mask, labs = ids.to(dev), mask.to(dev), labs.to(dev)
             with torch.autocast(dev, dtype=torch.float16, enabled=dev == "cuda"):
                 loss = model(input_ids=ids, attention_mask=mask, labels=labs).loss
-            opt.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(opt)
-            scaler.update()
-            sched.step()
+            scaler.scale(loss / ACCUM).backward()
+            if (step + 1) % ACCUM == 0:
+                scaler.step(opt)
+                scaler.update()
+                opt.zero_grad()
+                sched.step()
             if step % 100 == 0:
                 print(f"ep{ep} step{step}/{len(dl)} loss {loss.item():.3f}", flush=True)
         m = evaluate(by_split)
