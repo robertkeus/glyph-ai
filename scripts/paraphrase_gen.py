@@ -18,7 +18,7 @@ import anthropic
 from glyph.lang import BY_KEY
 from glyph.tasks import ROOT
 
-MODEL = "claude-sonnet-5"
+MODEL = "claude-haiku-4-5-20251001"
 OUT = ROOT / "glyph" / "paraphrases.json"
 N = 15
 
