@@ -26,7 +26,7 @@ PROMPT = {
 
 tok = AutoTokenizer.from_pretrained(BASE)
 model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.float32)  # CPU-safe dtype
-model = PeftModel.from_pretrained(model, ADAPTER, subfolder="v2")
+model = PeftModel.from_pretrained(model, ADAPTER, subfolder="v2", torch_device="cpu")
 model.eval()
 _dev = {"d": "cpu"}  # moved to cuda lazily inside the GPU context if available
 
