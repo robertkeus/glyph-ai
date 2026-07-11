@@ -41,7 +41,9 @@ button{background:var(--accent);color:#04222c;border:0;border-radius:10px;paddin
 a{color:var(--accent)}
 </style></head><body>
 <header><b>Glyph</b><span class="sub">two AI agents talking in their own language</span>
-<span class="meter">saved so far: <b id="saved">0</b> bytes (<span id="pct">–</span>)</span></header>
+<label style="margin-left:auto;font-size:.82rem;color:var(--dim);cursor:pointer">
+<input type="checkbox" id="live" style="accent-color:#7cdfff"> 🧠 live model (real agents, ~10s)</label>
+<span class="meter">saved: <b id="saved">0</b> bytes (<span id="pct">–</span>)</span></header>
 <div class="lane"><div class="who">🗣 Speaker <span style="font-weight:400">— understands you, speaks glyph</span></div>
 <div class="who r"><span style="font-weight:400">writes the code —</span> 🔨 Builder</div></div>
 <div id="log"></div>
@@ -94,8 +96,38 @@ function flyGlyphs(fromEl,toSide,glyphs,done){const r=fromEl.getBoundingClientRe
  requestAnimationFrame(()=>{f.style.left=(toSide==="r"?window.innerWidth-180:80)+"px";
   f.style.top=(r.top+40)+"px";f.style.opacity=.15});
  setTimeout(()=>{f.remove();done&&done()},950)}
+const API="https://robertkeus-glyph-v2.hf.space/gradio_api/call/glyph";
+async function callModel(msg){
+ const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({data:[msg]})});
+ const {event_id}=await r.json();
+ const t=await (await fetch(`${API}/${event_id}`)).text();
+ const line=t.split("\n").find(l=>l.startsWith("data:"));
+ return JSON.parse(line.slice(5))[0];
+}
+async function goLive(txt){
+ bub("c","userb",esc(txt));
+ const sb=bub("","speaker","<div class='tag'>🗣 speaker — encoding with the finetuned model…</div><div class='g'>…</div>");
+ try{
+  const d=await callModel(txt);
+  if(d.error){sb.innerHTML="<div class='tag'>🗣 speaker</div>"+esc(d.error);return}
+  const eb=new Blob([txt]).size;
+  sb.innerHTML=`<div class='tag'>🗣 speaker → builder (live model)</div><div class='g'>${esc(d.alien)}</div>
+   <div class='bytes'><span class='strike'>${eb} bytes of English</span>${d.bytes} bytes of glyph</div>`;
+  flyGlyphs(sb,"r",d.alien,()=>{
+   const bb=bub("r","builder",`<div class='tag'>🔨 builder — decoding ${esc(d.alien)} (live model)</div><pre></pre>`);
+   typeInto(bb.querySelector("pre"), d.code, ()=>{
+    bb.insertAdjacentHTML("beforeend",`<div class='ok'>solve([3, -1, 2, 2, -5]) → ${esc(d.result)} ✓</div>`);
+    savedB+=eb-d.bytes; engB+=eb;
+    document.getElementById("saved").textContent=savedB;
+    document.getElementById("pct").textContent=Math.round(100*savedB/engB)+"% smaller";
+   });
+  });
+ }catch(e){sb.innerHTML="<div class='tag'>🗣 speaker</div>⚠️ "+esc(e.message)+" (Space may be waking — retry)";}
+}
 function go(txt){
  const q=document.getElementById("q");txt=(txt||q.value).trim();if(!txt)return;q.value="";
+ if(document.getElementById("live").checked){goLive(txt);return;}
  const ops=parse(txt);
  bub("c","userb",esc(txt));
  if(!ops.length){bub("","speaker","<div class='tag'>🗣 speaker</div>I don't have symbols for that — try one of the suggestions.");return}
