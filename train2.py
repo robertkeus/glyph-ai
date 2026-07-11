@@ -28,6 +28,8 @@ from glyph.tasks import ROOT
 
 MODEL = os.environ.get("GLYPH_MODEL", "Qwen/Qwen2.5-Coder-3B-Instruct")
 SMOKE = bool(os.environ.get("SMOKE"))
+BANK = os.environ.get("BANK", "bank2.jsonl")   # BANK=bank3.jsonl SFT=sft3.jsonl -> v3 (slots)
+SFT = os.environ.get("SFT", "sft2.jsonl")
 OUT = "/kaggle/working/glyph_v2_adapter" if os.path.isdir("/kaggle") else "/tmp/glyph_v2_adapter"
 EPOCHS, BATCH, LR, EVAL_N = (1, 8, 2e-4, 40) if SMOKE else (3, 8, 2e-4, 200)
 ACCUM = 1 if SMOKE else 2
@@ -94,10 +96,10 @@ def evaluate(tasks_by_split):
 
 
 def main():
-    rows = [json.loads(l) for l in (ROOT / "tasks" / "sft2.jsonl").read_text().splitlines()]
+    rows = [json.loads(l) for l in (ROOT / "tasks" / SFT).read_text().splitlines()]
     random.shuffle(rows)
     rows = rows[:MAXPAIRS] if MAXPAIRS else rows
-    tasks = [json.loads(l) for l in (ROOT / "tasks" / "bank2.jsonl").read_text().splitlines()]
+    tasks = [json.loads(l) for l in (ROOT / "tasks" / BANK).read_text().splitlines()]
     by_split = {}
     for t in tasks:
         by_split.setdefault(t["split"], []).append(t)
