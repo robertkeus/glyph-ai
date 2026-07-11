@@ -30,3 +30,19 @@ out-compose the trained Builder.
 
 ## English baseline (Phase 0 smoke, 1.5B, CPU)
 pass_rate 0.833, bytes_per_solved 676 — harness proof only, superseded by the above.
+
+## Phase 2 — full finetune v2 (2026-07-10, seed 0)
+
+Qwen2.5-Coder-3B + one multi-task LoRA (r=32, all-linear), 40,592 pairs
+(sft2.jsonl: 68 primitives, 1,135 validated paraphrases), 3 epochs, Kaggle T4.
+
+| metric | e0 | e1 | e2 |
+|---|---|---|---|
+| builder: glyphs→code on HELD-OUT compositions (tests executed) | 96.5% | 98.5% | **99.5%** |
+| speaker: UNSEEN phrasings → exact glyph message | 84.5% | 85.5% | **86.5%** |
+| zero-shot symbols (never trained) | 1% | 2% | 2% |
+
+Gates: builder ≥90% PASSED (99.5). Speaker 86.5 vs 90 target — close; product
+covers the gap with the intent front-end (95%) or paraphrase-pool patches.
+Adapter: huggingface.co/robertkeus/glyph-adapters/tree/main/v2. Single seed so
+far; seeds 1-2 pending for variance.
