@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Glyph — watch two agents talk</title>
+<style>
+:root{--bg:#0b0d12;--panel:#141821;--edge:#232a37;--ink:#e6e9ef;--dim:#8b94a7;
+--accent:#7cdfff;--glyph:#ffd166;--pass:#4ade80;--user:#1f6feb;
+--mono:ui-monospace,Menlo,Consolas,monospace;--sans:ui-sans-serif,system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+display:flex;flex-direction:column;min-height:100vh}
+header{padding:.9rem 1.2rem;border-bottom:1px solid var(--edge);display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+header b{font-size:1.05rem}header .sub{color:var(--dim);font-size:.85rem}
+.meter{margin-left:auto;font-family:var(--mono);font-size:.85rem;color:var(--accent)}
+.meter b{color:var(--pass);font-size:1.05rem}
+.lane{display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:900px;width:100%;margin:0 auto;padding:.6rem 1rem 0}
+.lane .who{display:flex;align-items:center;gap:.5rem;font-weight:700;padding:.4rem 0;color:var(--dim);font-size:.9rem}
+.lane .who.r{justify-content:flex-end}
+#log{flex:1;max-width:900px;width:100%;margin:0 auto;padding:0 1rem 1rem;display:flex;flex-direction:column;gap:.65rem;overflow-y:auto}
+.row{display:flex}.row.r{justify-content:flex-end}.row.c{justify-content:center}
+.b{max-width:72%;padding:.6rem .85rem;border-radius:14px;font-size:.93rem;opacity:0;transform:translateY(8px);
+transition:all .35s ease}
+.b.show{opacity:1;transform:none}
+.speaker{background:#15202f;border:1px solid #23405f;border-bottom-left-radius:4px}
+.builder{background:#1c1a2b;border:1px solid #3b3560;border-bottom-right-radius:4px}
+.userb{background:var(--user);color:#fff;border-radius:14px}
+.tag{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.25rem}
+.g{font-size:1.9rem;color:var(--glyph);letter-spacing:.18em}
+.bytes{font-family:var(--mono);font-size:.78rem;color:var(--accent);margin-top:.3rem}
+.strike{color:var(--dim);text-decoration:line-through;margin-right:.4rem}
+pre{margin:.2rem 0 0;font-family:var(--mono);font-size:.8rem;white-space:pre-wrap;color:var(--ink)}
+.ok{font-family:var(--mono);color:var(--pass);margin-top:.3rem;font-size:.85rem}
+.fly{position:fixed;font-size:1.6rem;color:var(--glyph);z-index:9;pointer-events:none;
+transition:all .9s cubic-bezier(.5,0,.5,1)}
+.bar{border-top:1px solid var(--edge);padding:.7rem 1rem}
+.inner{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:.5rem}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.chip{background:#182030;border:1px solid var(--edge);color:var(--dim);border-radius:99px;padding:.2rem .65rem;font-size:.8rem;cursor:pointer}
+.chip:hover{color:var(--ink);border-color:var(--accent)}
+.inrow{display:flex;gap:.5rem}
+input{flex:1;background:#0d1017;border:1px solid var(--edge);color:var(--ink);border-radius:10px;padding:.6rem .85rem;font-size:1rem}
+button{background:var(--accent);color:#04222c;border:0;border-radius:10px;padding:0 1rem;font-weight:700;cursor:pointer}
+a{color:var(--accent)}
+</style></head><body>
+<header><b>Glyph</b><span class="sub">two AI agents talking in their own language</span>
+<span class="meter">saved so far: <b id="saved">0</b> bytes (<span id="pct">–</span>)</span></header>
+<div class="lane"><div class="who">🗣 Speaker <span style="font-weight:400">— understands you, speaks glyph</span></div>
+<div class="who r"><span style="font-weight:400">writes the code —</span> 🔨 Builder</div></div>
+<div id="log"></div>
+<div class="bar"><div class="inner">
+<div class="chips" id="chips"></div>
+<div class="inrow"><input id="q" placeholder="give the agents a task…"><button onclick="go()">Send</button></div>
+</div></div>
+<script>
+const OPS=[
+ {k:"evens",g:0x4e00,py:"r = [x for x in r if x % 2 == 0]",fn:r=>r.filter(x=>x%2===0),kw:["even"]},
+ {k:"pos",g:0x4e01,py:"r = [x for x in r if x > 0]",fn:r=>r.filter(x=>x>0),kw:["positive"]},
+ {k:"double",g:0x4e03,py:"r = [x * 2 for x in r]",fn:r=>r.map(x=>x*2),kw:["double","twice"]},
+ {k:"square",g:0x4e07,py:"r = [x * x for x in r]",fn:r=>r.map(x=>x*x),kw:["square"]},
+ {k:"inc",g:0x4e08,py:"r = [x + 1 for x in r]",fn:r=>r.map(x=>x+1),kw:["add one","increment","plus one"]},
+ {k:"negate",g:0x4e09,py:"r = [-x for x in r]",fn:r=>r.map(x=>-x),kw:["negate","flip sign","flip the sign","invert"]},
+ {k:"absval",g:0x4e0a,py:"r = [abs(x) for x in r]",fn:r=>r.map(x=>Math.abs(x)),kw:["absolute","abs value"]},
+ {k:"rev",g:0x4e0b,py:"r = list(reversed(r))",fn:r=>[...r].reverse(),kw:["revers","backward","back to front"]},
+ {k:"sorta",g:0x4e0d,py:"r = sorted(r)",fn:r=>[...r].sort((a,b)=>a-b),kw:["ascending","smallest to","low to high","increasing"]},
+ {k:"sortd",g:0x4e0e,py:"r = sorted(r, reverse=True)",fn:r=>[...r].sort((a,b)=>b-a),kw:["descending","big to small","large to small","high to low","biggest to"]},
+ {k:"uniq",g:0x4e0f,py:"r = list(dict.fromkeys(r))",fn:r=>[...new Set(r)],kw:["dedup","duplicate","unique","distinct"]},
+ {k:"dec",g:0x4e10,py:"r = [x - 1 for x in r]",fn:r=>r.map(x=>x-1),kw:["subtract one","decrement","minus one"]},
+ {k:"sum",g:0x4e11,py:"return sum(r)",fn:r=>r.reduce((a,b)=>a+b,0),red:1,kw:["sum","add up","total","add everything","add them"]},
+ {k:"max",g:0x4e13,py:"return max(r) if r else 0",fn:r=>r.length?Math.max(...r):0,red:1,kw:["max","biggest","largest","top one","the top","highest"]},
+ {k:"len",g:0x4e14,py:"return len(r)",fn:r=>r.length,red:1,kw:["how many","length","size"]},
+ {k:"cnt",g:0x4e15,py:"return sum(1 for _ in r)",fn:r=>r.length,red:1,kw:["count","number of"]}];
+const SAMPLE=[3,-1,2,2,-5];
+const EX=["keep positives, square them, then sum","sort big to small and give the top one",
+ "remove duplicates then add everything up","flip the sign then reverse"];
+const alien=cp=>String.fromCodePoint(0x1400+(cp-0x4e00));
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const fmt=v=>Array.isArray(v)?"["+v.join(", ")+"]":String(v);
+let savedB=0, engB=0;
+function parse(t){t=t.toLowerCase();const h=[];
+ for(const o of OPS){for(const w of o.kw){const i=t.indexOf(w);if(i>=0){h.push([i,o]);break}}}
+ h.sort((a,b)=>a[0]-b[0]);const s=new Set(),r=[];
+ for(const[,o]of h)if(!s.has(o.k)){s.add(o.k);r.push(o)}return r}
+function code(ops){const L=["def solve(xs):","    r = list(xs)"];
+ for(const o of ops){L.push("    "+o.py);if(o.red)return L.join("\n")}return L.concat(["    return r"]).join("\n")}
+function run(ops){let r=SAMPLE.slice();for(const o of ops){r=o.fn(r);if(o.red)return r}return r}
+const log=document.getElementById("log");
+function bub(side,cls,html){const row=document.createElement("div");row.className="row "+side;
+ const b=document.createElement("div");b.className="b "+cls;b.innerHTML=html;row.appendChild(b);
+ log.appendChild(row);requestAnimationFrame(()=>requestAnimationFrame(()=>b.classList.add("show")));
+ log.scrollTop=log.scrollHeight;return b}
+function typeInto(pre,text,done){let i=0;const t=setInterval(()=>{pre.textContent=text.slice(0,++i);
+ log.scrollTop=log.scrollHeight;if(i>=text.length){clearInterval(t);done&&done()}},14)}
+function flyGlyphs(fromEl,toSide,glyphs,done){const r=fromEl.getBoundingClientRect();
+ const f=document.createElement("div");f.className="fly";f.textContent=glyphs;
+ f.style.left=r.left+"px";f.style.top=r.top+"px";document.body.appendChild(f);
+ requestAnimationFrame(()=>{f.style.left=(toSide==="r"?window.innerWidth-180:80)+"px";
+  f.style.top=(r.top+40)+"px";f.style.opacity=.15});
+ setTimeout(()=>{f.remove();done&&done()},950)}
+function go(txt){
+ const q=document.getElementById("q");txt=(txt||q.value).trim();if(!txt)return;q.value="";
+ const ops=parse(txt);
+ bub("c","userb",esc(txt));
+ if(!ops.length){bub("","speaker","<div class='tag'>🗣 speaker</div>I don't have symbols for that — try one of the suggestions.");return}
+ const gl=ops.map(o=>alien(o.g)).join(""), gb=ops.length*2, eb=new Blob([txt]).size;
+ setTimeout(()=>{ // Speaker encodes
+  const sb=bub("","speaker",`<div class='tag'>🗣 speaker → builder</div><div class='g'>${gl}</div>
+   <div class='bytes'><span class='strike'>${eb} bytes of English</span>${gb} bytes of glyph</div>`);
+  flyGlyphs(sb, "r", gl, ()=>{ // message travels to Builder
+   const bb=bub("r","builder",`<div class='tag'>🔨 builder — decoding ${gl}</div><pre></pre>`);
+   typeInto(bb.querySelector("pre"), code(ops), ()=>{  // Builder types the code
+    const res=fmt(run(ops));
+    bb.insertAdjacentHTML("beforeend",`<div class='ok'>solve(${fmt(SAMPLE)}) → ${esc(res)} ✓</div>`);
+    savedB+=eb-gb; engB+=eb;
+    document.getElementById("saved").textContent=savedB;
+    document.getElementById("pct").textContent=Math.round(100*savedB/engB)+"% smaller";
+    log.scrollTop=log.scrollHeight;
+   });
+  });
+ },500);
+}
+const chips=document.getElementById("chips");
+EX.forEach(e=>{const c=document.createElement("span");c.className="chip";c.textContent=e;
+ c.onclick=()=>go(e);chips.appendChild(c)});
+document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")go()});
+setTimeout(()=>go(EX[0]),600);
+</script></body></html>
