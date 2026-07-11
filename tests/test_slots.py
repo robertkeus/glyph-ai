@@ -33,6 +33,17 @@ class TestSlots(unittest.TestCase):
                      ["evens", "double"]):
             self.assertEqual(decode_items(message(keys)), keys)
 
+    def test_string_operands(self):
+        self.assertEqual(parse("prefixs:#"), ("prefixs", "#"))
+        self.assertEqual(run_chain(["prefixs:#", "joins:,"], ["a", "b"]), "#a,#b")
+        ns = {}
+        exec(solution_py(["containss:e", "suffixs:!"]), ns)
+        self.assertEqual(ns["solve"](["he", "ox", "we"]), ["he!", "we!"])
+        for keys in (["prefixs:#", "joins:;"], ["startss:a", "counts"],
+                     ["containss:e", "endss:o"]):
+            self.assertEqual(decode_items(message(keys)), keys)
+        self.assertIn('with "#"', english(["prefixs:#"]))
+
     def test_operand_glyphs_disjoint_from_opcodes(self):
         msg = message(["addn:100"])
         self.assertEqual(len(msg), 4)                    # opcode + 3 digit glyphs

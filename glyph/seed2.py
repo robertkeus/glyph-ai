@@ -13,7 +13,11 @@ from glyph.tasks import ROOT
 SYM = {k: glyph(i) for i, k in enumerate(BY_KEY)}
 DIGIT_BASE = 200                             # inventory 200-209 = operand digits 0-9
 DIGIT = {str(d): glyph(DIGIT_BASE + d) for d in range(10)}
+VOCAB_BASE = 210                             # inventory 210+ = string-operand vocab
+VOCAB = ("#", "-", "_", "!", ",", ";", "a", "e", "o", "x")
+VGLYPH = {w: glyph(VOCAB_BASE + i) for i, w in enumerate(VOCAB)}
 _UNDIGIT = {v: k for k, v in DIGIT.items()}
+_UNVOCAB = {v: k for k, v in VGLYPH.items()}
 _UNSYM = {v: k for k, v in SYM.items()}
 _PARA = json.loads((ROOT / "glyph" / "paraphrases.json").read_text())
 # hold out the LAST 20% of each pool for the unseen-phrasing eval (never trained)
@@ -25,16 +29,23 @@ def message(keys):
     out = []
     for item in keys:
         k, a = parse(item)
-        out.append(SYM[k] + ("".join(DIGIT[c] for c in str(a)) if a is not None else ""))
+        if a is None:
+            out.append(SYM[k])
+        elif isinstance(a, int):
+            out.append(SYM[k] + "".join(DIGIT[c] for c in str(a)))
+        else:
+            out.append(SYM[k] + VGLYPH[a])
     return "".join(out)
 
 
 def decode_items(msg):
-    """Inverse of message(): glyph string -> chain items ('gtn:7' / 'evens')."""
+    """Inverse of message(): glyph string -> chain items ('gtn:7' / 'prefixs:#' / 'evens')."""
     items = []
     for ch in msg:
         if ch in _UNDIGIT and items:
             items[-1] += ("" if ":" in items[-1] else ":") + _UNDIGIT[ch]
+        elif ch in _UNVOCAB and items:
+            items[-1] += ":" + _UNVOCAB[ch]
         elif ch in _UNSYM:
             items.append(_UNSYM[ch])
     return items

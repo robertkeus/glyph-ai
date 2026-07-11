@@ -23,9 +23,16 @@ def _bases(keys):
     return [parse(k)[0] for k in keys]
 
 
+_SAFE = {":": "", "#": "hash", "-": "dash", "!": "bang", ",": "comma", ";": "semi"}
+
+
+def _ident(k):
+    return "".join(_SAFE.get(c, c) for c in k)
+
+
 def _task(keys, split):
     tin = compose(keys)
-    name = "op_" + "_".join(k.replace(":", "") for k in keys)
+    name = "op_" + "_".join(_ident(k) for k in keys)
     tests = "\n".join(
         f"assert {name}({inp!r}) == {run_chain(keys, inp)!r}" for inp in INPUTS[tin]
     )

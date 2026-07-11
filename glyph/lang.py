@@ -38,10 +38,12 @@ def _pa(key, tin, tout, py, js, en, fn, args, ends=False):
 
 
 def parse(item):
-    """Chain item -> (key, arg): 'gtn:7' -> ('gtn', 7); 'evens' -> ('evens', None)."""
+    """Chain item -> (key, arg): 'gtn:7' -> ('gtn', 7); 'prefixs:#' -> ('prefixs', '#');
+    'evens' -> ('evens', None). Int operands ride as digit glyphs, string operands
+    as single vocab glyphs (see seed2)."""
     if ":" in item:
-        k, a = item.split(":")
-        return k, int(a)
+        k, a = item.split(":", 1)
+        return k, (int(a) if a.lstrip("-").isdigit() else a)
     return item, None
 
 
@@ -345,6 +347,31 @@ _pa("minagen", "RL", "RL", "r = [d for d in r if d['age'] >= {a}]", "r = r.filte
     ["keep only people aged {a} or over", "filter to records with age at least {a}",
      "drop anyone under {a}"],
     lambda a: lambda r: [d for d in r if d['age'] >= a], (18, 21, 40, 65))
+
+# ---- string-operand primitives (operand = one vocab glyph on the wire) --------
+_pa("prefixs", "SL", "SL", "r = ['{a}' + s for s in r]", "r = r.map(s => '{a}' + s);",
+    ["prefix each with \"{a}\"", "add \"{a}\" to the start of each string", "prepend \"{a}\" to each"],
+    lambda a: lambda r: [a + s for s in r], ("#", "-", "_"))
+_pa("suffixs", "SL", "SL", "r = [s + '{a}' for s in r]", "r = r.map(s => s + '{a}');",
+    ["append \"{a}\" to each", "add \"{a}\" to the end of each string", "tack \"{a}\" onto each"],
+    lambda a: lambda r: [s + a for s in r], ("!", "-"))
+_pa("containss", "SL", "SL", "r = [s for s in r if '{a}' in s]", "r = r.filter(s => s.includes('{a}'));",
+    ["keep strings containing \"{a}\"", "keep only strings with \"{a}\" in them",
+     "drop strings without \"{a}\""],
+    lambda a: lambda r: [s for s in r if a in s], ("a", "e", "o", "x"))
+_pa("startss", "SL", "SL", "r = [s for s in r if s.startswith('{a}')]",
+    "r = r.filter(s => s.startsWith('{a}'));",
+    ["keep strings starting with \"{a}\"", "keep only strings that begin with \"{a}\"",
+     "drop strings not starting with \"{a}\""],
+    lambda a: lambda r: [s for s in r if s.startswith(a)], ("a", "o", "#"))
+_pa("endss", "SL", "SL", "r = [s for s in r if s.endswith('{a}')]",
+    "r = r.filter(s => s.endsWith('{a}'));",
+    ["keep strings ending with \"{a}\"", "keep only strings that end in \"{a}\"",
+     "drop strings not ending with \"{a}\""],
+    lambda a: lambda r: [s for s in r if s.endswith(a)], ("e", "o"))
+_pa("joins", "SL", "S", "return '{a}'.join(r)", "return r.join('{a}');",
+    ["join them with \"{a}\"", "concatenate with \"{a}\" between", "return them as one \"{a}\"-separated string"],
+    lambda a: lambda r: a.join(r), (",", ";", "-"), ends=True)
 
 BY_KEY = {p.key: p for p in P}
 INPUTS = {
