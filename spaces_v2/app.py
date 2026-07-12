@@ -26,7 +26,7 @@ PROMPT = {
 
 tok = AutoTokenizer.from_pretrained(BASE)
 model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.float32)  # CPU-safe dtype
-model = PeftModel.from_pretrained(model, ADAPTER, subfolder=os.environ.get("GLYPH_V", "v3"),
+model = PeftModel.from_pretrained(model, ADAPTER, subfolder=os.environ.get("GLYPH_V", "v4"),
                                   torch_device="cpu")
 model.eval()
 _dev = {"d": "cpu"}  # moved to cuda lazily inside the GPU context if available
@@ -108,7 +108,7 @@ EX = ["keep the positive numbers, square each, then return their sum",
 with gr.Blocks(title="Glyph v2") as demo:
     gr.ChatInterface(respond, examples=EX, title="Glyph v2 — live finetuned model",
                      description="Every reply is the real trained pipeline: speaker → glyphs "
-                                 "→ builder → executed Python. (builder 99.5% held-out)")
+                                 "→ builder → executed Python. (v4: 99 prims incl. operands, CRUD, UI; builder 99.5% held-out)")
     _i = gr.Textbox(visible=False)
     _o = gr.JSON(visible=False)
     _b = gr.Button(visible=False)

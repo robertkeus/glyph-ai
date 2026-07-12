@@ -68,3 +68,26 @@ digit/vocab glyphs (84.5% vs 86.5% — within noise of the added difficulty).
 Zero-shot unchanged: never-trained opcodes (incl. slotted ltn) don't decode —
 known limitation, same as v2. Adapter:
 huggingface.co/robertkeus/glyph-adapters/tree/main/v3.
+
+## Phase 2 — v4 finetune: all use-case families (2026-07-12, seed 0)
+
+Language v4: 99 primitives across every roadmap domain — core list/string ops,
+int slots, string operands, validation/field family (2-slot field+param, e.g.
+fminlen:email:5), CRUD (id-based fdel/fkeep, fincr field update), UI blocks
+(htmlli/htmlopt/htmlul), auth checks (fminlen:password:8). 50,605 pairs
+(bank3: 9,430 tasks; 1,629 validated paraphrases). Zero-shot pool now 10
+opcodes incl. slotted ltn/fsorts/fkeep and htmlopt. Same recipe: 3B, LoRA
+r=32, 3 epochs, T4.
+
+| metric | e0 | e1 | e2 |
+|---|---|---|---|
+| builder: glyphs→code on HELD-OUT compositions (tests executed) | 97.5% | 95.5% | **99.5%** |
+| speaker: UNSEEN phrasings → exact glyph message | 82% | 86% | **86.5%** |
+| zero-shot symbols (never trained) | 10% | 18% | **8%** |
+
+Builder holds 99.5% and speaker matches v2's best (86.5%) on a language 46%
+larger with two-operand slots. NEW: zero-shot decode moved for the first time
+(8-18% vs 1-2% in v2/v3) — with 10 held-out opcodes spread across richer
+families, the model sometimes infers a never-trained symbol's meaning from
+family context. Adapter: huggingface.co/robertkeus/glyph-adapters/tree/main/v4
+(live in the glyph-v2 Space, GLYPH_V selects version).
