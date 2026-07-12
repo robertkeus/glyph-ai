@@ -50,6 +50,20 @@ class TestSlots(unittest.TestCase):
         self.assertIn("email", e)
         self.assertIn("5", e)
 
+    def test_crud_and_ui_families(self):
+        recs = [{"id": 1, "name": "Ada", "age": 36, "email": "ada@x.io"},
+                {"id": 2, "name": "Bo", "age": 12, "email": "box"}]
+        self.assertEqual(run_chain(["fdel:1", "fplucks:name"], recs), ["Bo"])
+        ns = {}
+        exec(solution_py(["fincr:age:10", "fplucki:age"]), ns)   # escaped-brace template
+        self.assertEqual(ns["solve"](recs), [46, 22])
+        self.assertEqual(run_chain(["htmlul"], ["a", "b"]), "<ul><li>a</li><li>b</li></ul>")
+        ns2 = {}
+        exec(solution_py(["htmlli"]), ns2)                        # f-string braces, unslotted
+        self.assertEqual(ns2["solve"](["x"]), "<li>x</li>")
+        for k in (["fdel:2", "countrl"], ["fincr:age:1", "fgt:age:18"], ["fkeep:3"]):
+            self.assertEqual(decode_items(message(k)), k)
+
     def test_string_operands(self):
         self.assertEqual(parse("prefixs:#"), ("prefixs", "#"))
         self.assertEqual(run_chain(["prefixs:#", "joins:,"], ["a", "b"]), "#a,#b")

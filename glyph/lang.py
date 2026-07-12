@@ -393,7 +393,7 @@ _pa("joins", "SL", "S", "return '{a}'.join(r)", "return r.join('{a}');",
 _pa("fnonempty", "RL", "RL", "r = [d for d in r if d['{a}']]", "r = r.filter(d => d.{a});",
     ["drop records where {a} is empty", "keep only records with a non-empty {a}",
      "remove entries missing a {a}"],
-    lambda a: lambda r: [d for d in r if d[a]], ("name", "email"))
+    lambda a: lambda r: [d for d in r if d[a]], ("name", "email", "password"))
 _pa("fsorts", "RL", "RL", "r = sorted(r, key=lambda d: d['{a}'])",
     "r = r.slice().sort((a, b) => a.{a} < b.{a} ? -1 : a.{a} > b.{a} ? 1 : 0);",
     ["sort records by {a}", "order the records by their {a}", "arrange records alphabetically by {a}"],
@@ -421,22 +421,54 @@ _p2("fminlen", "RL", "RL", "r = [d for d in r if len(d['{a}']) >= {b}]",
     ["keep records whose {a} is at least {b} characters", "require a {a} of {b}+ characters",
      "drop records with a {a} shorter than {b}"],
     lambda a, b: lambda r: [d for d in r if len(d[a]) >= b],
-    (("name", 3), ("email", 5)))
+    (("name", 3), ("email", 5), ("password", 8)))
 _p2("fgt", "RL", "RL", "r = [d for d in r if d['{a}'] > {b}]", "r = r.filter(d => d.{a} > {b});",
     ["keep records whose {a} is greater than {b}", "filter to records with {a} above {b}",
      "drop records whose {a} is {b} or less"],
     lambda a, b: lambda r: [d for d in r if d[a] > b],
     (("age", 18), ("age", 30), ("age", 65)))
 
+# ---- CRUD family (records have an int id) --------------------------------------
+_pa("fdel", "RL", "RL", "r = [d for d in r if d['id'] != {a}]", "r = r.filter(d => d.id !== {a});",
+    ["delete the record with id {a}", "remove the entry whose id is {a}", "drop record {a}"],
+    lambda a: lambda r: [d for d in r if d['id'] != a], (1, 2, 3))
+_pa("fkeep", "RL", "RL", "r = [d for d in r if d['id'] == {a}]", "r = r.filter(d => d.id === {a});",
+    ["keep only the record with id {a}", "fetch the entry whose id is {a}", "select record {a}"],
+    lambda a: lambda r: [d for d in r if d['id'] == a], (1, 2, 3))
+_p2("fincr", "RL", "RL", "r = [{{**d, '{a}': d['{a}'] + {b}}} for d in r]",
+    "r = r.map(d => ({{...d, {a}: d.{a} + {b}}}));",
+    ["increase every record's {a} by {b}", "add {b} to each {a}", "bump each {a} up by {b}"],
+    lambda a, b: lambda r: [{**d, a: d[a] + b} for d in r],
+    (("age", 1), ("age", 10)))
+
+# ---- UI-block family (SL -> one HTML/markup string) ------------------------------
+_p("htmlli", "SL", "S", "return ''.join(f'<li>{s}</li>' for s in r)",
+   "return r.map(s => `<li>${s}</li>`).join('');",
+   ["render them as HTML list items", "wrap each in <li> tags and concatenate",
+    "return one string of <li> elements"],
+   lambda r: ''.join(f'<li>{s}</li>' for s in r), ends=True)
+_p("htmlopt", "SL", "S", "return ''.join(f'<option>{s}</option>' for s in r)",
+   "return r.map(s => `<option>${s}</option>`).join('');",
+   ["render them as HTML select options", "wrap each in <option> tags and concatenate",
+    "return one string of <option> elements"],
+   lambda r: ''.join(f'<option>{s}</option>' for s in r), ends=True)
+_p("htmlul", "SL", "S", "return '<ul>' + ''.join(f'<li>{s}</li>' for s in r) + '</ul>'",
+   "return '<ul>' + r.map(s => `<li>${s}</li>`).join('') + '</ul>';",
+   ["render them as an HTML unordered list", "wrap each in <li> inside a <ul>",
+    "return a complete <ul> markup string"],
+   lambda r: '<ul>' + ''.join(f'<li>{s}</li>' for s in r) + '</ul>', ends=True)
+
 BY_KEY = {p.key: p for p in P}
 INPUTS = {
     "IL": [[1, 2, 3, 4], [], [-2, -1, 0, 1, 2], [5, 5, 5], [3, 1, 2], [10], [2, 4, 6], [-7, 12, -7]],
     "SL": [["Hello", "world"], [], ["  a ", "", "BC", "bc"], ["one", "one", "Two"], ["x"], ["abc", "de", ""]],
-    "RL": [[{"name": "Ada", "age": 36, "email": "ada@x.io"}, {"name": "Bo", "age": 12, "email": "bo(at)x"}],
+    "RL": [[{"id": 1, "name": "Ada", "age": 36, "email": "ada@x.io", "password": "s3cretpw"},
+            {"id": 2, "name": "Bo", "age": 12, "email": "bo(at)x", "password": "pw"}],
            [],
-           [{"name": "Cy", "age": 18, "email": ""}, {"name": "Dee", "age": 65, "email": "dee@y.com"},
-            {"name": "El", "age": 17, "email": "el@"}],
-           [{"name": "Fi", "age": 41, "email": "fi@z.nl"}]],
+           [{"id": 1, "name": "Cy", "age": 18, "email": "", "password": "longenough1"},
+            {"id": 2, "name": "Dee", "age": 65, "email": "dee@y.com", "password": ""},
+            {"id": 3, "name": "El", "age": 17, "email": "el@", "password": "abc12345"}],
+           [{"id": 4, "name": "Fi", "age": 41, "email": "fi@z.nl", "password": "hunter2"}]],
 }
 
 
@@ -493,7 +525,7 @@ def run_chain(keys, value):
 
 
 NOUN = {"IL": "a list of integers", "SL": "a list of strings",
-        "RL": "a list of people records (name, age)"}
+        "RL": "a list of people records (id, name, age, email, password)"}
 
 
 def english(keys, variant=0):

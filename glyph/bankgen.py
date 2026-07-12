@@ -14,8 +14,9 @@ import random
 from glyph.lang import BY_KEY, INPUTS, compose, english, parse, run_chain, solution_py
 from glyph.tasks import ROOT
 
-# never seen in training (one per family; ltn/fsorts = zero-shot SLOTTED opcodes)
-ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults", "ltn", "fsorts")
+# never seen in training (one per family; ltn/fsorts/fkeep = zero-shot SLOTTED opcodes)
+ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults", "ltn", "fsorts",
+            "fkeep", "htmlopt")
 RNG = random.Random(0)
 
 

@@ -15,7 +15,7 @@ DIGIT_BASE = 200                             # inventory 200-209 = operand digit
 DIGIT = {str(d): glyph(DIGIT_BASE + d) for d in range(10)}
 VOCAB_BASE = 210                             # inventory 210+ = string-operand vocab (append-only)
 VOCAB = ("#", "-", "_", "!", ",", ";", "a", "e", "o", "x",
-         "name", "email", "age", "@", ".")
+         "name", "email", "age", "@", ".", "password")
 VGLYPH = {w: glyph(VOCAB_BASE + i) for i, w in enumerate(VOCAB)}
 _UNDIGIT = {v: k for k, v in DIGIT.items()}
 _UNVOCAB = {v: k for k, v in VGLYPH.items()}
