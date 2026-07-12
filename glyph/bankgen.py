@@ -14,8 +14,8 @@ import random
 from glyph.lang import BY_KEY, INPUTS, compose, english, parse, run_chain, solution_py
 from glyph.tasks import ROOT
 
-# never seen in training (one per family; ltn = a zero-shot SLOTTED opcode)
-ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults", "ltn")
+# never seen in training (one per family; ltn/fsorts = zero-shot SLOTTED opcodes)
+ZEROSHOT = ("halve", "revstr", "range_", "cube", "title", "adults", "ltn", "fsorts")
 RNG = random.Random(0)
 
 
@@ -23,7 +23,8 @@ def _bases(keys):
     return [parse(k)[0] for k in keys]
 
 
-_SAFE = {":": "", "#": "hash", "-": "dash", "!": "bang", ",": "comma", ";": "semi"}
+_SAFE = {":": "", "#": "hash", "-": "dash", "!": "bang", ",": "comma", ";": "semi",
+         "@": "at", ".": "dot"}
 
 
 def _ident(k):
@@ -44,9 +45,14 @@ def _task(keys, split):
     }
 
 
+def _item(k, a):
+    if a is None:
+        return k
+    return ":".join([k] + [str(x) for x in (a if isinstance(a, tuple) else (a,))])
+
+
 def chains(max_len=3):
-    keys = [f"{k}:{a}" if p.slots else k
-            for k, p in BY_KEY.items() for a in (p.args or (None,))]
+    keys = [_item(k, a) for k, p in BY_KEY.items() for a in (p.args or (None,))]
     out = []
     for n in range(1, max_len + 1):
         for combo in itertools.product(keys, repeat=n):

@@ -7,14 +7,15 @@ and translator pairs (glyphs → English) from bank2, cycling phrasing variants.
 import json
 
 from glyph.channel import glyph
-from glyph.lang import BY_KEY, NOUN, parse
+from glyph.lang import BY_KEY, NOUN, _args, _fmt, parse
 from glyph.tasks import ROOT
 
 SYM = {k: glyph(i) for i, k in enumerate(BY_KEY)}
 DIGIT_BASE = 200                             # inventory 200-209 = operand digits 0-9
 DIGIT = {str(d): glyph(DIGIT_BASE + d) for d in range(10)}
-VOCAB_BASE = 210                             # inventory 210+ = string-operand vocab
-VOCAB = ("#", "-", "_", "!", ",", ";", "a", "e", "o", "x")
+VOCAB_BASE = 210                             # inventory 210+ = string-operand vocab (append-only)
+VOCAB = ("#", "-", "_", "!", ",", ";", "a", "e", "o", "x",
+         "name", "email", "age", "@", ".")
 VGLYPH = {w: glyph(VOCAB_BASE + i) for i, w in enumerate(VOCAB)}
 _UNDIGIT = {v: k for k, v in DIGIT.items()}
 _UNVOCAB = {v: k for k, v in VGLYPH.items()}
@@ -29,25 +30,24 @@ def message(keys):
     out = []
     for item in keys:
         k, a = parse(item)
-        if a is None:
-            out.append(SYM[k])
-        elif isinstance(a, int):
-            out.append(SYM[k] + "".join(DIGIT[c] for c in str(a)))
-        else:
-            out.append(SYM[k] + VGLYPH[a])
+        out.append(SYM[k])
+        for v in _args(a):
+            out.append("".join(DIGIT[c] for c in str(v)) if isinstance(v, int) else VGLYPH[v])
     return "".join(out)
 
 
 def decode_items(msg):
-    """Inverse of message(): glyph string -> chain items ('gtn:7' / 'prefixs:#' / 'evens')."""
+    """Inverse of message(): glyph string -> chain items ('gtn:7' / 'fminlen:name:3' /
+    'evens'). A vocab glyph always starts a new operand; consecutive digits merge
+    into one int (the registry never puts two int operands adjacent)."""
     items = []
     for ch in msg:
-        if ch in _UNDIGIT and items:
-            items[-1] += ("" if ":" in items[-1] else ":") + _UNDIGIT[ch]
+        if ch in _UNSYM:
+            items.append(_UNSYM[ch])
         elif ch in _UNVOCAB and items:
             items[-1] += ":" + _UNVOCAB[ch]
-        elif ch in _UNSYM:
-            items.append(_UNSYM[ch])
+        elif ch in _UNDIGIT and items:
+            items[-1] += ("" if items[-1][-1].isdigit() else ":") + _UNDIGIT[ch]
     return items
 
 
@@ -57,7 +57,7 @@ def phrased(keys, variant, pools=TRAIN_PARA):
         k, a = parse(item)
         pool = pools.get(k) or BY_KEY[k].en   # slotted prims: registry templates until paraphrased
         t = pool[(variant * 7 + i) % len(pool)]
-        parts.append(t.format(a=a) if a is not None else t)
+        parts.append(_fmt(t, a) if a is not None else t)
     return f"Take {NOUN[BY_KEY[parse(keys[0])[0]].tin]}; " + ", then ".join(parts) + "."
 
 

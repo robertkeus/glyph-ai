@@ -37,14 +37,28 @@ def _pa(key, tin, tout, py, js, en, fn, args, ends=False):
     P.append(Prim(key, tin, tout, py, js, en, fn, ends, slots=1, args=args))
 
 
+def _typed(s):
+    return int(s) if s.lstrip("-").isdigit() else s
+
+
 def parse(item):
     """Chain item -> (key, arg): 'gtn:7' -> ('gtn', 7); 'prefixs:#' -> ('prefixs', '#');
-    'evens' -> ('evens', None). Int operands ride as digit glyphs, string operands
-    as single vocab glyphs (see seed2)."""
-    if ":" in item:
-        k, a = item.split(":", 1)
-        return k, (int(a) if a.lstrip("-").isdigit() else a)
-    return item, None
+    'fminlen:name:3' -> ('fminlen', ('name', 3)); 'evens' -> ('evens', None).
+    Int operands ride as digit glyphs, string operands as single vocab glyphs (seed2)."""
+    if ":" not in item:
+        return item, None
+    k, rest = item.split(":", 1)
+    parts = rest.split(":")
+    return k, (_typed(parts[0]) if len(parts) == 1 else tuple(_typed(p) for p in parts))
+
+
+def _args(a):
+    return () if a is None else (a if isinstance(a, tuple) else (a,))
+
+
+def _fmt(tpl, a):
+    v = _args(a)
+    return tpl.format(a=v[0], b=v[1] if len(v) > 1 else "")
 
 
 # ---- int-list -> int-list (v1 family, re-declared with types) ----------------
@@ -373,14 +387,56 @@ _pa("joins", "SL", "S", "return '{a}'.join(r)", "return r.join('{a}');",
     ["join them with \"{a}\"", "concatenate with \"{a}\" between", "return them as one \"{a}\"-separated string"],
     lambda a: lambda r: a.join(r), (",", ";", "-"), ends=True)
 
+# ---- validation / field family (records: name, age, email; operand = field) ----
+# Two-slot prims take (field, param); wire = opcode + field vocab glyph + param
+# glyph(s). No prim may take two consecutive int operands (digit runs must merge).
+_pa("fnonempty", "RL", "RL", "r = [d for d in r if d['{a}']]", "r = r.filter(d => d.{a});",
+    ["drop records where {a} is empty", "keep only records with a non-empty {a}",
+     "remove entries missing a {a}"],
+    lambda a: lambda r: [d for d in r if d[a]], ("name", "email"))
+_pa("fsorts", "RL", "RL", "r = sorted(r, key=lambda d: d['{a}'])",
+    "r = r.slice().sort((a, b) => a.{a} < b.{a} ? -1 : a.{a} > b.{a} ? 1 : 0);",
+    ["sort records by {a}", "order the records by their {a}", "arrange records alphabetically by {a}"],
+    lambda a: lambda r: sorted(r, key=lambda d: d[a]), ("name", "email"))
+_pa("fplucks", "RL", "SL", "r = [d['{a}'] for d in r]", "r = r.map(d => d.{a});",
+    ["extract the {a} of each record", "pluck the {a} field from each", "keep just each record's {a}"],
+    lambda a: lambda r: [d[a] for d in r], ("name", "email"))
+_pa("fplucki", "RL", "IL", "r = [d['{a}'] for d in r]", "r = r.map(d => d.{a});",
+    ["extract the {a} of each record", "pluck the {a} field from each", "keep just each record's {a}"],
+    lambda a: lambda r: [d[a] for d in r], ("age",))
+
+
+def _p2(key, tin, tout, py, js, en, fn, args, ends=False):
+    P.append(Prim(key, tin, tout, py, js, en, fn, ends, slots=2, args=args))
+
+
+_p2("fcontains", "RL", "RL", "r = [d for d in r if '{b}' in d['{a}']]",
+    "r = r.filter(d => d.{a}.includes('{b}'));",
+    ["keep records whose {a} contains \"{b}\"", "filter to records with \"{b}\" in the {a}",
+     "drop records whose {a} lacks \"{b}\""],
+    lambda a, b: lambda r: [d for d in r if b in d[a]],
+    (("email", "@"), ("email", "."), ("name", "a")))
+_p2("fminlen", "RL", "RL", "r = [d for d in r if len(d['{a}']) >= {b}]",
+    "r = r.filter(d => d.{a}.length >= {b});",
+    ["keep records whose {a} is at least {b} characters", "require a {a} of {b}+ characters",
+     "drop records with a {a} shorter than {b}"],
+    lambda a, b: lambda r: [d for d in r if len(d[a]) >= b],
+    (("name", 3), ("email", 5)))
+_p2("fgt", "RL", "RL", "r = [d for d in r if d['{a}'] > {b}]", "r = r.filter(d => d.{a} > {b});",
+    ["keep records whose {a} is greater than {b}", "filter to records with {a} above {b}",
+     "drop records whose {a} is {b} or less"],
+    lambda a, b: lambda r: [d for d in r if d[a] > b],
+    (("age", 18), ("age", 30), ("age", 65)))
+
 BY_KEY = {p.key: p for p in P}
 INPUTS = {
     "IL": [[1, 2, 3, 4], [], [-2, -1, 0, 1, 2], [5, 5, 5], [3, 1, 2], [10], [2, 4, 6], [-7, 12, -7]],
     "SL": [["Hello", "world"], [], ["  a ", "", "BC", "bc"], ["one", "one", "Two"], ["x"], ["abc", "de", ""]],
-    "RL": [[{"name": "Ada", "age": 36}, {"name": "Bo", "age": 12}],
+    "RL": [[{"name": "Ada", "age": 36, "email": "ada@x.io"}, {"name": "Bo", "age": 12, "email": "bo(at)x"}],
            [],
-           [{"name": "Cy", "age": 18}, {"name": "Dee", "age": 65}, {"name": "El", "age": 17}],
-           [{"name": "Fi", "age": 41}]],
+           [{"name": "Cy", "age": 18, "email": ""}, {"name": "Dee", "age": 65, "email": "dee@y.com"},
+            {"name": "El", "age": 17, "email": "el@"}],
+           [{"name": "Fi", "age": 41, "email": "fi@z.nl"}]],
 }
 
 
@@ -390,7 +446,7 @@ def _inst(keys):
     for item in keys:
         k, a = parse(item)
         p = BY_KEY[k]
-        if bool(p.slots) != (a is not None):
+        if p.slots != len(_args(a)):
             return None
         out.append((p, a))
     return out
@@ -412,7 +468,7 @@ def compose(keys):
 def solution_py(keys, name="solve"):
     lines = [f"def {name}(xs):", "    r = list(xs)"]
     for p, a in _inst(keys):
-        lines.append("    " + (p.py.format(a=a) if p.slots else p.py))
+        lines.append("    " + (_fmt(p.py, a) if p.slots else p.py))
         if p.ends:
             return "\n".join(lines)
     return "\n".join(lines + ["    return r"])
@@ -421,7 +477,7 @@ def solution_py(keys, name="solve"):
 def solution_js(keys):
     lines = ["function solve(xs) {", "  let r = [...xs];"]
     for p, a in _inst(keys):
-        lines.append("  " + (p.js.format(a=a) if p.slots else p.js))
+        lines.append("  " + (_fmt(p.js, a) if p.slots else p.js))
         if p.ends:
             return "\n".join(lines + ["}"])
     return "\n".join(lines + ["  return r;", "}"])
@@ -430,7 +486,7 @@ def solution_js(keys):
 def run_chain(keys, value):
     r = list(value)
     for p, a in _inst(keys):
-        r = (p.fn(a) if p.slots else p.fn)(r)
+        r = (p.fn(*_args(a)) if p.slots else p.fn)(r)
         if p.ends:
             return r
     return r
@@ -444,5 +500,5 @@ def english(keys, variant=0):
     parts = []
     for p, a in _inst(keys):
         t = p.en[variant % len(p.en)]
-        parts.append(t.format(a=a) if p.slots else t)
+        parts.append(_fmt(t, a) if p.slots else t)
     return f"Take {NOUN[BY_KEY[parse(keys[0])[0]].tin]}; " + ", then ".join(parts) + "."

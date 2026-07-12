@@ -33,6 +33,23 @@ class TestSlots(unittest.TestCase):
                      ["evens", "double"]):
             self.assertEqual(decode_items(message(keys)), keys)
 
+    def test_field_operands_two_slots(self):
+        self.assertEqual(parse("fminlen:name:3"), ("fminlen", ("name", 3)))
+        self.assertEqual(compose(["fcontains:email:@", "fplucks:name"]), "RL")
+        self.assertIsNone(compose(["fminlen:name", "countrl"]))    # missing 2nd operand
+        recs = [{"name": "Ada", "age": 36, "email": "ada@x.io"},
+                {"name": "Bo", "age": 12, "email": "box"}]
+        keys = ["fcontains:email:@", "fplucks:name"]
+        self.assertEqual(run_chain(keys, recs), ["Ada"])
+        ns = {}
+        exec(solution_py(keys), ns)
+        self.assertEqual(ns["solve"](recs), ["Ada"])
+        for k in (keys, ["fgt:age:18", "fplucki:age"], ["fminlen:email:5", "countrl"]):
+            self.assertEqual(decode_items(message(k)), k)
+        e = english(["fminlen:email:5"])
+        self.assertIn("email", e)
+        self.assertIn("5", e)
+
     def test_string_operands(self):
         self.assertEqual(parse("prefixs:#"), ("prefixs", "#"))
         self.assertEqual(run_chain(["prefixs:#", "joins:,"], ["a", "b"]), "#a,#b")

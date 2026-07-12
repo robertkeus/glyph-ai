@@ -34,16 +34,18 @@ def ask(prompt, max_tokens=1000):
 
 def generate(key):
     p = BY_KEY[key]
-    slot = (" Use the literal placeholder {a} wherever the number goes, in every "
-            "phrasing (write it exactly as {a})." if p.slots else "")
+    need = ["{a}", "{b}"][:p.slots]
+    slot = (f" Use the literal placeholder(s) {' and '.join(need)} for the operand(s), "
+            f"in every phrasing (write them exactly as given)." if p.slots else "")
     q = (f"Operation on {p.tin}: \"{p.en[0]}\" (code: `{p.py}`).\n"
          f"Write {N} short, varied English phrasings a real user might type for exactly "
          f"this operation — mix formal and casual, include one terse and one wordy. "
          f"One per line, no numbering, no quotes.{slot}")
     lines = [l.strip("-• ").strip() for l in ask(q).splitlines() if l.strip()]
-    if p.slots:  # must survive .format(a=...): only {a} braces allowed
+    if p.slots:  # must survive .format(): only the required placeholder braces allowed
         lines = [l for l in lines
-                 if l.count("{a}") >= 1 and l.count("{") == l.count("}") == l.count("{a}")]
+                 if all(l.count(n) >= 1 for n in need)
+                 and l.count("{") == l.count("}") == sum(l.count(n) for n in need)]
     return [l for l in lines if 3 <= len(l) <= 90][:N]
 
 
