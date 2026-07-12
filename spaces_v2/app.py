@@ -16,7 +16,22 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 BASE = "Qwen/Qwen2.5-Coder-3B-Instruct"
 ADAPTER = "robertkeus/glyph-adapters"
-DEMO = [3, -1, 2, 2, -5]
+DEMO = {
+    "IL": [3, -1, 2, 2, -5],
+    "SL": ["hello", "World", "", "ada"],
+    "RL": [{"id": 1, "name": "Ada", "age": 36, "email": "ada@x.io", "password": "s3cretpw"},
+           {"id": 2, "name": "Bo", "age": 12, "email": "", "password": "pw"},
+           {"id": 3, "name": "Cy", "age": 65, "email": "cy@y.com", "password": "hunter2"}],
+}
+
+
+def demo_for(code):
+    """Pick the demo input by sniffing the generated code's loop variable/field access."""
+    if "d[" in code:
+        return DEMO["RL"]
+    if " s in r" in code or "(s)" in code or ".join(r)" in code or "key=len" in code:
+        return DEMO["SL"]
+    return DEMO["IL"]
 
 PROMPT = {
     "speaker": "Encode this task as glyph symbols.\nTask: {x}\nSymbols:",
@@ -62,17 +77,19 @@ def pipeline(msg, raw_glyphs):
 
 
 def run_code(code):
-    src = f"{code}\n\nprint(solve({DEMO}))\n"
+    demo = demo_for(code)
+    src = f"{code}\n\nprint(solve({demo!r}))\n"
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
         f.write(src); path = f.name
     try:
         p = subprocess.run([sys.executable, "-I", path], capture_output=True,
                            text=True, timeout=5)
-        return p.stdout.strip() if p.returncode == 0 else "error: " + p.stderr.strip()[-120:]
+        out = p.stdout.strip() if p.returncode == 0 else "error: " + p.stderr.strip()[-120:]
     except Exception as e:
-        return f"error: {type(e).__name__}"
+        out = f"error: {type(e).__name__}"
     finally:
         os.unlink(path)
+    return demo, out
 
 
 def respond(msg, _history):
@@ -84,7 +101,7 @@ def respond(msg, _history):
         return f"⚠️ {d['error']}"
     return (f"**glyph message:** {d['alien']}  ·  {d['bytes']} bytes\n\n"
             f"**model reads it as:** {d['english']}\n\n"
-            f"```python\n{d['code']}\n```\n\n`solve({DEMO})` → `{d['result']}`")
+            f"```python\n{d['code']}\n```\n\n`solve({d['input']})` → `{d['result']}`")
 
 
 def api_json(msg):
@@ -94,7 +111,7 @@ def api_json(msg):
     try:
         d = pipeline(msg, raw if is_glyphs(raw) else None)
         if "code" in d:
-            d["result"] = run_code(d["code"])
+            d["input"], d["result"] = run_code(d["code"])
         return d
     except Exception as e:
         return {"error": f"{type(e).__name__}: {str(e)[:150]}"}
@@ -102,8 +119,9 @@ def api_json(msg):
 
 EX = ["keep the positive numbers, square each, then return their sum",
       "keep values greater than 7, then count them",
-      "add 100 to each, then keep only the first 2",
-      "take the absolute value of each, sort ascending, return the maximum (0 if empty)"]
+      "drop records where email is empty, then extract the name of each record",
+      "delete the record with id 2, then count the records",
+      "uppercase each string, then render them as an HTML unordered list"]
 
 with gr.Blocks(title="Glyph v2") as demo:
     gr.ChatInterface(respond, examples=EX, title="Glyph v2 — live finetuned model",
