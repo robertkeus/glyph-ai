@@ -46,3 +46,25 @@ Gates: builder ≥90% PASSED (99.5). Speaker 86.5 vs 90 target — close; produc
 covers the gap with the intent front-end (95%) or paraphrase-pool patches.
 Adapter: huggingface.co/robertkeus/glyph-adapters/tree/main/v2. Single seed so
 far; seeds 1-2 pending for variance.
+
+## Phase 2 — v3 finetune: argument slots + string operands (2026-07-12, seed 0)
+
+Language v3: 86 primitives — 12 int-slotted (operand = digit glyphs 200-209,
+multi-digit works: addn:100, minagen:18) + 6 string-slotted (operand = one
+vocab glyph, 210-219: # - _ ! , ; a e o x). 50,448 pairs (sft3.jsonl, bank3:
+9,408 tasks, 6,287 slotted; 1,427 validated paraphrases incl. {a} templates).
+Same recipe: Qwen2.5-Coder-3B, one multi-task LoRA r=32, 3 epochs, T4.
+
+| metric | e0 | e1 | e2 |
+|---|---|---|---|
+| builder: glyphs→code on HELD-OUT compositions (tests executed) | 98% | 98% | **99.5%** |
+| speaker: UNSEEN phrasings → exact glyph message (incl. operand transcription) | 85.5% | 83.5% | **84.5%** |
+| zero-shot symbols (never trained, incl. slotted ltn) | 5% | 4% | 2% |
+
+Operand slots cost nothing: builder held-out identical to v2 (99.5%) even
+though 2/3 of held-out compositions now carry operands the builder must place
+into code, and the speaker must transcribe free-text numbers/separators into
+digit/vocab glyphs (84.5% vs 86.5% — within noise of the added difficulty).
+Zero-shot unchanged: never-trained opcodes (incl. slotted ltn) don't decode —
+known limitation, same as v2. Adapter:
+huggingface.co/robertkeus/glyph-adapters/tree/main/v3.
