@@ -26,7 +26,8 @@ PROMPT = {
 
 tok = AutoTokenizer.from_pretrained(BASE)
 model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.float32)  # CPU-safe dtype
-model = PeftModel.from_pretrained(model, ADAPTER, subfolder="v2", torch_device="cpu")
+model = PeftModel.from_pretrained(model, ADAPTER, subfolder=os.environ.get("GLYPH_V", "v3"),
+                                  torch_device="cpu")
 model.eval()
 _dev = {"d": "cpu"}  # moved to cuda lazily inside the GPU context if available
 
@@ -100,8 +101,8 @@ def api_json(msg):
 
 
 EX = ["keep the positive numbers, square each, then return their sum",
-      "drop duplicates, sort descending",
-      "keep multiples of three, then count them",
+      "keep values greater than 7, then count them",
+      "add 100 to each, then keep only the first 2",
       "take the absolute value of each, sort ascending, return the maximum (0 if empty)"]
 
 with gr.Blocks(title="Glyph v2") as demo:
