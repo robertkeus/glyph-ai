@@ -48,12 +48,12 @@ model.eval()
 def gen(prompt, max_new, chat=False, vanilla=False):
     """Returns (text, generated_token_count)."""
     if chat:
-        ids = tok.apply_chat_template([{"role": "user", "content": prompt}],
-                                      add_generation_prompt=True, return_tensors="pt").to(dev)
-        enc = {"input_ids": ids}
+        enc = tok.apply_chat_template([{"role": "user", "content": prompt}],
+                                      add_generation_prompt=True, return_dict=True,
+                                      return_tensors="pt").to(dev)
     else:
         enc = tok(prompt, return_tensors="pt", add_special_tokens=False).to(dev)
-        ids = enc["input_ids"]
+    ids = enc["input_ids"]
     ctx = model.disable_adapter() if vanilla else torch.no_grad()
     with ctx:
         out = model.generate(**enc, max_new_tokens=max_new, do_sample=False,
